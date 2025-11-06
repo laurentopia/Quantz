@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ETF Distribution & NAV Comparator (Fixed)</title>
+    <title>ETF Distribution & NAV Comparator</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * {
@@ -35,6 +35,57 @@
             font-size: 28px;
         }
         
+        .timeframe {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .timeframe input {
+            width: 200px;
+            margin: 0 auto;
+        }
+        
+        .ticker-tool {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f0f0f0;
+            border-radius: 8px;
+        }
+        
+        .ticker-tool h3 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+        
+        .ticker-inputs {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr;
+            gap: 10px;
+            align-items: end;
+        }
+        
+        .ticker-inputs input, .ticker-inputs button {
+            margin-bottom: 0;
+        }
+        
+        .apply-buttons {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .apply-buttons button {
+            flex: 1;
+            padding: 12px;
+            font-size: 14px;
+        }
+        
+        .apply-buttons button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+        
         .controls {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -47,11 +98,6 @@
             border-radius: 8px;
             padding: 20px;
             border: 2px solid #e0e0e0;
-            transition: border-color 0.3s;
-        }
-        
-        .etf-panel:hover {
-            border-color: #667eea;
         }
         
         .etf-panel h2 {
@@ -78,22 +124,11 @@
             border: 1px solid #ddd;
             border-radius: 4px;
             font-size: 14px;
-            transition: border-color 0.3s;
         }
         
         input:focus {
             outline: none;
             border-color: #667eea;
-        }
-        
-        .timeframe {
-            margin-bottom: 20px;
-            text-align: center;
-        }
-        
-        .timeframe input {
-            width: 200px;
-            margin: 0 auto;
         }
         
         .chart-container {
@@ -134,29 +169,6 @@
             margin-top: 5px;
         }
         
-        .ticker-tool {
-            margin-top: 40px;
-            padding: 20px;
-            background: #f0f0f0;
-            border-radius: 8px;
-        }
-        
-        .ticker-tool h3 {
-            margin-bottom: 15px;
-            color: #333;
-        }
-        
-        .ticker-inputs {
-            display: grid;
-            grid-template-columns: 2fr 1fr 1fr 1fr;
-            gap: 10px;
-            align-items: end;
-        }
-        
-        .ticker-inputs input, .ticker-inputs button {
-            margin-bottom: 0;
-        }
-        
         button {
             padding: 10px 20px;
             background: #667eea;
@@ -165,16 +177,16 @@
             border-radius: 4px;
             cursor: pointer;
             font-weight: 600;
-            transition: background 0.3s;
         }
         
-        button:hover {
+        button:hover:not(:disabled) {
             background: #5a6fd8;
         }
         
         button:disabled {
             background: #ccc;
             cursor: not-allowed;
+            opacity: 0.6;
         }
         
         .decouple-toggle {
@@ -245,28 +257,80 @@
             margin-top: 10px;
         }
         
-        .retry-button {
-            background: #ffc107;
-            color: #333;
-            margin-left: 10px;
-        }
-        
         .proxy-status {
             font-size: 11px;
             color: #666;
             margin-top: 5px;
         }
+        
+        .quick-tickers {
+            margin-top: 10px;
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+        
+        .quick-tickers button {
+            padding: 5px 10px;
+            font-size: 12px;
+            background: #6c757d;
+        }
+        
+        .quick-tickers button:hover {
+            background: #5a6268;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>ETF Distribution & NAV Comparator (Fixed)</h1>
+        <h1>ETF Distribution & NAV Comparator</h1>
         
         <div class="timeframe">
             <div class="input-group">
                 <label for="timeframe">Time Frame (Weeks)</label>
                 <input type="number" id="timeframe" value="52" min="1" max="520">
             </div>
+        </div>
+        
+        <div class="ticker-tool">
+            <h3>Automatic Ticker Analysis (Yahoo Finance)</h3>
+            <div id="ticker-error" class="error"></div>
+            <div id="ticker-info" class="info">
+                Fetches real data from Yahoo Finance using multiple proxy endpoints. Distribution history is extracted from dividend events.
+            </div>
+            <div id="ticker-success" class="success" style="display: none;"></div>
+            <div id="ticker-loading" class="loading" style="display: none;">
+                Attempting to fetch data...
+            </div>
+            <div class="ticker-inputs">
+                <div class="input-group">
+                    <label for="ticker">Ticker Symbol</label>
+                    <input type="text" id="ticker" placeholder="e.g., JEPY, QQQY, JEPI, SPY">
+                </div>
+                <div class="input-group">
+                    <label for="start-date">Start Date</label>
+                    <input type="date" id="start-date">
+                </div>
+                <div class="input-group">
+                    <label for="end-date">End Date</label>
+                    <input type="date" id="end-date">
+                </div>
+                <button onclick="analyzeTicker()" id="analyze-btn">Analyze Ticker</button>
+            </div>
+            <div class="quick-tickers">
+                <button onclick="setTickerAndLoad('JEPY')">JEPY</button>
+                <button onclick="setTickerAndLoad('QQQY')">QQQY</button>
+                <button onclick="setTickerAndLoad('JEPI')">JEPI</button>
+                <button onclick="setTickerAndLoad('SPY')">SPY</button>
+                <button onclick="setTickerAndLoad('QQQ')">QQQ</button>
+                <button onclick="setTickerAndLoad('MAIN')">MAIN</button>
+            </div>
+            <div class="apply-buttons">
+                <button onclick="applyToETF(1)" disabled id="apply-etf1-btn">→ Apply to ETF 1</button>
+                <button onclick="applyToETF(2)" disabled id="apply-etf2-btn">→ Apply to ETF 2</button>
+            </div>
+            <button onclick="loadMockData()" style="background: #ffc107; color: #333; margin-top: 10px;">Load Mock Data (Demo)</button>
+            <div class="proxy-status" id="proxy-status"></div>
         </div>
         
         <div class="controls">
@@ -373,36 +437,6 @@
             </div>
         </div>
         
-        <div class="ticker-tool">
-            <h3>Automatic Ticker Analysis (Yahoo Finance)</h3>
-            <div id="ticker-error" class="error"></div>
-            <div id="ticker-info" class="info">
-                Fetches real data from Yahoo Finance using multiple proxy endpoints. Distribution history is extracted from dividend events.
-            </div>
-            <div id="ticker-success" class="success" style="display: none;"></div>
-            <div id="ticker-loading" class="loading" style="display: none;">
-                Attempting to fetch data...
-            </div>
-            <div class="ticker-inputs">
-                <div class="input-group">
-                    <label for="ticker">Ticker Symbol</label>
-                    <input type="text" id="ticker" placeholder="e.g., JEPY, QQQY, JEPI, SPY">
-                </div>
-                <div class="input-group">
-                    <label for="start-date">Start Date</label>
-                    <input type="date" id="start-date">
-                </div>
-                <div class="input-group">
-                    <label for="end-date">End Date</label>
-                    <input type="date" id="end-date">
-                </div>
-                <button onclick="analyzeTicker()" id="analyze-btn">Analyze Ticker</button>
-            </div>
-            <button onclick="loadMockData()" style="background: #ffc107; color: #333; margin-top: 10px;">Load Mock Data (Demo)</button>
-            <button onclick="retryWithDifferentProxy()" class="retry-button" style="display: none;" id="retry-btn">Retry with Backup Proxy</button>
-            <div class="proxy-status" id="proxy-status"></div>
-        </div>
-        
         <div class="url-share">
             <button onclick="shareSimulation()">Copy Share URL</button>
             <div id="url-status" style="margin-top: 10px; font-size: 14px; color: #28a745;"></div>
@@ -421,6 +455,7 @@
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                animation: false, // Disable all animations
                 interaction: {
                     mode: 'index',
                     intersect: false,
@@ -494,6 +529,7 @@
         ];
         
         let currentProxyIndex = 0;
+        let analysisResults = null; // Store analysis results
         
         // Utility functions
         function debounce(func, wait) {
@@ -785,8 +821,40 @@
                 }
             ];
             
-            chart.update();
+            chart.update('none'); // Update without animation
             updateURL();
+        }
+        
+        // Apply analysis results to ETF
+        function applyToETF(etfNumber) {
+            if (!analysisResults) return;
+            
+            const results = analysisResults;
+            
+            if (etfNumber === 1) {
+                document.getElementById('etf1-nav').value = results.initialNav.toFixed(2);
+                document.getElementById('etf1-nav-decay').value = (results.navDecay * 100).toFixed(2);
+                document.getElementById('etf1-dist-rate').value = (results.distRate * 100).toFixed(3);
+                document.getElementById('etf1-dist-decay').value = (results.distDecay * 100).toFixed(2);
+            } else if (etfNumber === 2) {
+                document.getElementById('etf2-nav').value = results.initialNav.toFixed(2);
+                document.getElementById('etf2-nav-decay').value = (results.navDecay * 100).toFixed(2);
+                document.getElementById('etf2-dist-rate').value = (results.distRate * 100).toFixed(3);
+                document.getElementById('etf2-dist-decay').value = (results.distDecay * 100).toFixed(2);
+            }
+            
+            // Disable apply buttons after applying
+            document.getElementById('apply-etf1-btn').disabled = true;
+            document.getElementById('apply-etf2-btn').disabled = true;
+            analysisResults = null;
+            
+            calculate();
+        }
+        
+        // Set ticker and load mock data
+        function setTickerAndLoad(ticker) {
+            document.getElementById('ticker').value = ticker;
+            loadMockData();
         }
         
         // Yahoo Finance analysis with smart proxy rotation
@@ -798,13 +866,16 @@
             const infoDiv = document.getElementById('ticker-info');
             const successDiv = document.getElementById('ticker-success');
             const loadingDiv = document.getElementById('ticker-loading');
-            const retryBtn = document.getElementById('retry-btn');
             const analyzeBtn = document.getElementById('analyze-btn');
+            const applyBtn1 = document.getElementById('apply-etf1-btn');
+            const applyBtn2 = document.getElementById('apply-etf2-btn');
             
             errorDiv.textContent = '';
             successDiv.textContent = '';
             loadingDiv.style.display = 'block';
             analyzeBtn.disabled = true;
+            applyBtn1.disabled = true;
+            applyBtn2.disabled = true;
             
             if (!ticker || !startDate || !endDate) {
                 errorDiv.textContent = 'Please fill all fields';
@@ -817,7 +888,6 @@
                 const period1 = Math.floor(new Date(startDate).getTime() / 1000);
                 const period2 = Math.floor(new Date(endDate).getTime() / 1000);
                 
-                // Try multiple proxy endpoints
                 const priceUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?period1=${period1}&period2=${period2}&interval=1d`;
                 const divUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?period1=${period1}&period2=${period2}&interval=1d&events=div`;
                 
@@ -845,12 +915,10 @@
                 
                 // Extract weekly price data
                 const weeklyPrices = [];
-                const weeklyDates = [];
                 
                 for (let i = 0; i < timestamps.length; i += 7) {
                     if (quotes.close && quotes.close[i]) {
                         weeklyPrices.push(quotes.close[i]);
-                        weeklyDates.push(new Date(timestamps[i] * 1000).toISOString().split('T')[0]);
                     }
                 }
                 
@@ -877,12 +945,10 @@
                     totalDividends = dividends.reduce((sum, div) => sum + div.amount, 0);
                     dividendCount = dividends.length;
                     
-                    // Calculate average distribution rate and decay
                     const avgPrice = weeklyPrices.reduce((a, b) => a + b, 0) / weeklyPrices.length;
                     const weeks = weeklyPrices.length - 1;
                     avgDistRate = (totalDividends / weeks) / avgPrice;
                     
-                    // Calculate distribution decay (if any)
                     if (dividends.length >= 2) {
                         const firstHalf = dividends.slice(0, Math.ceil(dividends.length / 2));
                         const secondHalf = dividends.slice(Math.floor(dividends.length / 2));
@@ -896,9 +962,8 @@
                     successDiv.textContent = `Found ${dividendCount} distributions totaling $${totalDividends.toFixed(3)} over ${weeks} weeks. Average weekly yield: ${(avgDistRate * 100).toFixed(3)}%`;
                     successDiv.style.display = 'block';
                 } else {
-                    infoDiv.textContent = 'No distribution history found in dividend events. Estimating yield from adjusted close prices...';
+                    infoDiv.textContent = 'No distribution history found. Estimating yield from adjusted close prices...';
                     
-                    // Estimate yield from adjusted close differences
                     if (indicators.adjclose && indicators.adjclose[0].adjclose) {
                         const adjClose = indicators.adjclose[0].adjclose;
                         const weeklyAdjPrices = [];
@@ -915,25 +980,28 @@
                     }
                 }
                 
-                // Apply to ETF1 fields
-                document.getElementById('etf1-nav').value = weeklyPrices[0].toFixed(2);
-                document.getElementById('etf1-nav-decay').value = (avgNavDecay * 100).toFixed(2);
-                document.getElementById('etf1-dist-rate').value = (avgDistRate * 100).toFixed(3);
-                document.getElementById('etf1-dist-decay').value = (distDecay * 100).toFixed(2);
+                // Store results instead of applying them
+                analysisResults = {
+                    initialNav: weeklyPrices[0],
+                    navDecay: avgNavDecay,
+                    distRate: avgDistRate,
+                    distDecay: distDecay
+                };
                 
-                infoDiv.textContent = `Analysis complete: ${ticker} data loaded from Yahoo Finance. Using ${PROXY_ENDPOINTS[currentProxyIndex].name} proxy.`;
+                // Enable apply buttons
+                applyBtn1.disabled = false;
+                applyBtn2.disabled = false;
+                
+                infoDiv.textContent = `Analysis complete: ${ticker} data loaded from Yahoo Finance. Select where to apply the data.`;
                 
                 setTimeout(() => {
                     successDiv.style.display = 'none';
                 }, 5000);
                 
-                calculate();
-                
             } catch (error) {
                 loadingDiv.style.display = 'none';
                 analyzeBtn.disabled = false;
                 errorDiv.textContent = 'Error: ' + error.message;
-                retryBtn.style.display = 'inline-block';
                 
                 if (currentProxyIndex < PROXY_ENDPOINTS.length - 1) {
                     infoDiv.textContent = `Proxy failed. Click "Retry with Backup Proxy" to try ${PROXY_ENDPOINTS[currentProxyIndex + 1].name}.`;
@@ -945,14 +1013,6 @@
             }
         }
         
-        // Retry with next proxy
-        function retryWithDifferentProxy() {
-            document.getElementById('retry-btn').style.display = 'none';
-            document.getElementById('ticker-error').textContent = '';
-            currentProxyIndex = (currentProxyIndex + 1) % PROXY_ENDPOINTS.length;
-            analyzeTicker();
-        }
-        
         // Load mock data
         function loadMockData() {
             const ticker = document.getElementById('ticker').value || 'JEPY';
@@ -960,21 +1020,26 @@
             
             const mockData = generateMockData(ticker);
             
-            // Apply to ETF1 fields
-            document.getElementById('etf1-nav').value = mockData.initialNav.toFixed(2);
-            document.getElementById('etf1-nav-decay').value = (mockData.navDecay * 100).toFixed(2);
-            document.getElementById('etf1-dist-rate').value = (mockData.distRate * 100).toFixed(2);
-            document.getElementById('etf1-dist-decay').value = (mockData.distDecay * 100).toFixed(2);
+            // Store mock results
+            analysisResults = {
+                initialNav: mockData.initialNav,
+                navDecay: mockData.navDecay,
+                distRate: mockData.distRate,
+                distDecay: mockData.distDecay
+            };
             
-            document.getElementById('ticker-success').textContent = `Loaded mock data for ${mockData.name}`;
+            // Enable apply buttons
+            document.getElementById('apply-etf1-btn').disabled = false;
+            document.getElementById('apply-etf2-btn').disabled = false;
+            
+            document.getElementById('ticker-success').textContent = `Loaded mock data for ${mockData.name}. Select where to apply.`;
             document.getElementById('ticker-success').style.display = 'block';
-            document.getElementById('retry-btn').style.display = 'none';
             
             setTimeout(() => {
                 document.getElementById('ticker-success').style.display = 'none';
             }, 3000);
             
-            calculate();
+            document.getElementById('ticker-info').textContent = 'Mock data ready. Click "Apply to ETF 1" or "Apply to ETF 2" to use.';
         }
         
         // Event listeners
@@ -1085,35 +1150,9 @@
             });
         }
         
-        // Add popular ticker buttons for quick access
-        function addQuickTickerButtons() {
-            const container = document.createElement('div');
-            container.style.marginTop = '10px';
-            container.style.display = 'flex';
-            container.style.gap = '5px';
-            container.style.flexWrap = 'wrap';
-            
-            const tickers = ['JEPY', 'QQQY', 'JEPI', 'SPY', 'QQQ', 'MAIN'];
-            tickers.forEach(ticker => {
-                const btn = document.createElement('button');
-                btn.textContent = ticker;
-                btn.style.background = '#6c757d';
-                btn.style.padding = '5px 10px';
-                btn.style.fontSize = '12px';
-                btn.onclick = () => {
-                    document.getElementById('ticker').value = ticker;
-                    loadMockData();
-                };
-                container.appendChild(btn);
-            });
-            
-            document.querySelector('.ticker-inputs').appendChild(container);
-        }
-        
         // Initial load
         loadFromURL();
         calculate();
-        addQuickTickerButtons();
     </script>
 </body>
 </html>
