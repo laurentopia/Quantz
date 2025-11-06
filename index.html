@@ -1,3 +1,497 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>High-Yield ETF Simulator</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  body{font-family:Inter, system-ui, Arial; margin:18px; color:#111}
+  h1{font-size:18px; margin:0 0 8px}
+  .row{display:flex; gap:12px; align-items:flex-start; flex-wrap:wrap}
+  .card{border:1px solid #ddd; padding:10px; border-radius:8px; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,0.03)}
+  .inputs{min-width:280px; max-width:520px}
+  label{display:block; font-size:12px; margin-top:8px}
+  input[type=number], input[type=text], select{width:100%; padding:6px 8px; margin-top:4px; box-sizing:border-box}
+  .small{font-size:12px; color:#555}
+  canvas{background:#fafafa; border-radius:8px}
+  .summary{display:flex; gap:12px; margin-top:10px; flex-wrap:wrap}
+  .summary .mini{padding:8px; border-radius:6px; min-width:180px}
+  .controls{display:flex; gap:8px; flex-wrap:wrap; align-items:center}
+  .legend-square{display:inline-block; width:12px; height:12px; border:2px solid #000; margin-right:6px; vertical-align:middle}
+  .muted{color:#666; font-size:13px}
+  .ticker-box{display:flex; gap:6px; align-items:center}
+  .btn{padding:6px 10px; border-radius:6px; border:1px solid #bbb; background:#f6f6f6; cursor:pointer}
+</style>
+</head>
+<body>
+<h1>High-Yield ETF Simulator</h1>
+<div class="row">
+  <div class="card inputs">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <strong>Scenario A</strong>
+      <div class="small">color: <span style="color:rgba(54,162,235,1)">blue</span></div>
+    </div>
+    <label>Initial NAV ($/share)</label>
+    <input id="a_nav0" type="number" step="0.0001" value="100" />
+    <label>NAV decay rate (% per week; negative = growth)</label>
+    <input id="a_nav_decay" type="number" step="0.0001" value="-0.1" />
+    <label>Distribution (% of NAV per week)</label>
+    <input id="a_dist_pct" type="number" step="0.0001" value="0.5" />
+    <label>Distribution decay (% change per week)</label>
+    <input id="a_dist_decay" type="number" step="0.0001" value="-0.2" />
+    <label><input id="a_decouple" type="checkbox" /> Decouple yield: use absolute $/week (instead of % of NAV)</label>
+    <label>If decoupled, absolute distribution $/week</label>
+    <input id="a_dist_abs" type="number" step="0.0001" value="0.5" />
+  </div>
+
+  <div class="card inputs">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <strong>Scenario B</strong>
+      <div class="small">color: <span style="color:rgba(255,99,132,1)">red</span></div>
+    </div>
+    <label>Initial NAV ($/share)</label>
+    <input id="b_nav0" type="number" step="0.0001" value="100" />
+    <label>NAV decay rate (% per week; negative = growth)</label>
+    <input id="b_nav_decay" type="number" step="0.0001" value="-0.02" />
+    <label>Distribution (% of NAV per week)</label>
+    <input id="b_dist_pct" type="number" step="0.0001" value="0.15" />
+    <label>Distribution decay (% change per week)</label>
+    <input id="b_dist_decay" type="number" step="0.0001" value="-0.05" />
+    <label><input id="b_decouple" type="checkbox" /> Decouple yield: use absolute $/week</label>
+    <label>If decoupled, absolute distribution $/week</label>
+    <input id="b_dist_abs" type="number" step="0.0001" value="0.15" />
+  </div>
+
+  <div class="card" style="flex:1; min-width:320px;">
+    <label>Time frame (weeks)</label>
+    <input id="weeks" type="number" value="208" min="1" />
+    <label>Starting shares owned (per scenario) — used for DRIP baseline</label>
+    <input id="start_shares" type="number" step="0.0001" value="1" />
+    <label>Reinvest distributions immediately (DRIP)? <select id="drip_mode"><option value="reinvest">Reinvest weekly</option><option value="cash">Cash no reinvest</option></select></label>
+    <label>Ticker auto-fill (date range) - enter ticker and click Analyze</label>
+    <div class="ticker-box">
+      <input id="ticker" type="text" placeholder="e.g. ULTY" />
+      <input id="date_from" type="text" placeholder="YYYY-MM-DD" style="width:120px" />
+      <input id="date_to" type="text" placeholder="YYYY-MM-DD" style="width:120px" />
+      <button id="analyze" class="btn">Analyze</button>
+    </div>
+    <div class="small muted" id="fetch_status"></div>
+    <div style="margin-top:8px" class="controls">
+      <button id="share" class="btn">Copy share URL</button>
+      <button id="reset" class="btn">Reset</button>
+    </div>
+    <div class="small" style="margin-top:8px">
+      [Unverified] Assumption: distribution% is percent *per week* of NAV. Change decouple to supply absolute $/week. If you prefer annual yield inputs, convert to weekly before use.
+    </div>
+  </div>
+</div>
+
+<div style="margin-top:12px" class="card">
+  <canvas id="mainChart" height="250"></canvas>
+  <div class="summary" id="summaryArea"></div>
+</div>
+
+<script>
+/* ------------------- Utilities ------------------- */
+const el = id=>document.getElementById(id);
+function qnum(id){ return parseFloat(el(id).value || 0); }
+function clamp(v,min,max){return Math.max(min,Math.min(max,v));}
+
+/* ------------------- State encode/decode to URL ------------------- */
+function getState(){
+  return {
+    a_nav0: qnum('a_nav0'),
+    a_nav_decay: qnum('a_nav_decay'),
+    a_dist_pct: qnum('a_dist_pct'),
+    a_dist_decay: qnum('a_dist_decay'),
+    a_decouple: el('a_decouple').checked,
+    a_dist_abs: qnum('a_dist_abs'),
+    b_nav0: qnum('b_nav0'),
+    b_nav_decay: qnum('b_nav_decay'),
+    b_dist_pct: qnum('b_dist_pct'),
+    b_dist_decay: qnum('b_dist_decay'),
+    b_decouple: el('b_decouple').checked,
+    b_dist_abs: qnum('b_dist_abs'),
+    weeks: parseInt(el('weeks').value),
+    start_shares: qnum('start_shares'),
+    drip_mode: el('drip_mode').value,
+    // ticker UI values (not stored for privacy unless user wants)
+    ticker: el('ticker').value,
+    date_from: el('date_from').value,
+    date_to: el('date_to').value
+  };
+}
+function setState(st){
+  if(!st) return;
+  for(const k in st){
+    if(k in window && false) continue;
+  }
+  if('a_nav0' in st) el('a_nav0').value = st.a_nav0;
+  if('a_nav_decay' in st) el('a_nav_decay').value = st.a_nav_decay;
+  if('a_dist_pct' in st) el('a_dist_pct').value = st.a_dist_pct;
+  if('a_dist_decay' in st) el('a_dist_decay').value = st.a_dist_decay;
+  if('a_decouple' in st) el('a_decouple').checked = !!st.a_decouple;
+  if('a_dist_abs' in st) el('a_dist_abs').value = st.a_dist_abs;
+  if('b_nav0' in st) el('b_nav0').value = st.b_nav0;
+  if('b_nav_decay' in st) el('b_nav_decay').value = st.b_nav_decay;
+  if('b_dist_pct' in st) el('b_dist_pct').value = st.b_dist_pct;
+  if('b_dist_decay' in st) el('b_dist_decay').value = st.b_dist_decay;
+  if('b_decouple' in st) el('b_decouple').checked = !!st.b_decouple;
+  if('b_dist_abs' in st) el('b_dist_abs').value = st.b_dist_abs;
+  if('weeks' in st) el('weeks').value = st.weeks;
+  if('start_shares' in st) el('start_shares').value = st.start_shares;
+  if('drip_mode' in st) el('drip_mode').value = st.drip_mode;
+  if('ticker' in st) el('ticker').value = st.ticker;
+  if('date_from' in st) el('date_from').value = st.date_from;
+  if('date_to' in st) el('date_to').value = st.date_to;
+}
+function pushStateToUrl(){
+  const s = getState();
+  const str = btoa(unescape(encodeURIComponent(JSON.stringify(s))));
+  const u = new URL(location.href);
+  u.searchParams.set('s', str);
+  history.replaceState(null,'',u.toString());
+}
+function loadStateFromUrl(){
+  const u = new URL(location.href);
+  const s = u.searchParams.get('s');
+  if(!s) return;
+  try{
+    const json = JSON.parse(decodeURIComponent(escape(atob(s))));
+    setState(json);
+  }catch(e){ console.warn('failed to load state',e); }
+}
+
+/* ------------------- Simulation math ------------------- */
+/*
+Model:
+- NAV_t: nav at week t
+- DistPct_t: distribution percent at week t (if not decoupled)
+- DistAbs_t: distribution absolute $ per week (if decoupled)
+- We simulate week-by-week:
+  - distribution paid = if decoupled ? DistAbs_t : (DistPct_t/100) * NAV_t * shares
+  - if DRIP (reinvest), we convert distribution $ into additional shares at current NAV_t (i.e. buy shares at end-of-week NAV)
+  - shares update = shares + distribution / NAV_t (if NAV_t > 0)
+  - cumulative distributions tracked (cash if not reinvest)
+Notes:
+- DistPct and NAV decay rates are percentages per week. e.g. nav_decay -0.1 means -0.1% per week growth (increase).
+- All percentages entered as percent (e.g., 0.5 = 0.5% per week)
+*/
+function simulate(params){
+  // params: {nav0, nav_decay_pct, dist_pct, dist_decay_pct, decouple, dist_abs, weeks, start_shares, drip_mode}
+  const weeks = params.weeks|0;
+  const nav = new Array(weeks+1);
+  const shares_no_drip = new Array(weeks+1); // shares if not reinvesting (stays constant)
+  const shares_drip = new Array(weeks+1); // shares if reinvesting weekly
+  const distro_weekly_cash = new Array(weeks+1); // distributions paid each week (cash)
+  const distro_weekly_reinvest = new Array(weeks+1); // distributions paid then reinvested (shown as cash value before reinvest)
+  const cumulative_cash = new Array(weeks+1);
+  const cumulative_reinvested = new Array(weeks+1);
+
+  let nav_t = params.nav0;
+  let dist_pct_t = params.dist_pct;
+  let dist_abs_t = params.dist_abs;
+  let shares0 = params.start_shares;
+
+  nav[0] = nav_t;
+  shares_no_drip[0] = shares0;
+  shares_drip[0] = shares0;
+  cumulative_cash[0] = 0;
+  cumulative_reinvested[0] = 0;
+  distro_weekly_cash[0] = 0;
+  distro_weekly_reinvest[0] = 0;
+
+  for(let t=1;t<=weeks;t++){
+    // update nav applying rate (percent per week)
+    // nav_decay_pct is percent per week, e.g. -0.1 => -0.1% per week -> multiply by (1 + nav_decay_pct/100)
+    nav_t = nav_t * (1 + params.nav_decay_pct/100);
+
+    // update distribution percent / absolute
+    dist_pct_t = dist_pct_t * (1 + params.dist_decay_pct/100);
+    dist_abs_t = dist_abs_t * (1 + params.dist_decay_pct/100); // if decoupled we still apply dist decay to absolute number
+
+    // compute distribution per share (value)
+    let weekly_dist_value_per_share;
+    if(params.decouple){
+      weekly_dist_value_per_share = dist_abs_t; // absolute $ per week PER SHARE? user wanted absolute $/week; ambiguous.
+      // [Unverified] INTERPRETATION: when decoupled, user inputs distribution as $/share/week. (If they meant $ total/week, adjust.)
+    } else {
+      weekly_dist_value_per_share = (dist_pct_t/100) * nav_t;
+    }
+
+    // cash distribution amount for this week
+    const cash_dist = weekly_dist_value_per_share * shares_no_drip[t-1];
+    distro_weekly_cash[t] = cash_dist;
+    cumulative_cash[t] = cumulative_cash[t-1] + cash_dist;
+
+    // For reinvest: distribution value is used to buy shares at current nav_t (if nav_t <=0, no reinvest)
+    const reinvest_value = weekly_dist_value_per_share * shares_drip[t-1];
+    distro_weekly_reinvest[t] = reinvest_value;
+    let added_shares = 0;
+    if(nav_t > 0 && params.drip_mode === 'reinvest'){
+      added_shares = reinvest_value / nav_t;
+    }
+    shares_drip[t] = shares_drip[t-1] + added_shares;
+    cumulative_reinvested[t] = cumulative_reinvested[t-1] + reinvest_value;
+
+    // shares no drip remain constant
+    shares_no_drip[t] = shares_no_drip[t-1];
+    nav[t] = nav_t;
+  }
+
+  // compute portfolio values
+  const portfolio_value_no_drip = nav.map((v,i)=> v * shares_no_drip[i]);
+  const portfolio_value_drip = nav.map((v,i)=> v * shares_drip[i]);
+
+  return {
+    weeks: weeks,
+    nav: nav,
+    shares_no_drip,
+    shares_drip,
+    distro_weekly_cash,
+    distro_weekly_reinvest,
+    cumulative_cash,
+    cumulative_reinvested,
+    portfolio_value_no_drip,
+    portfolio_value_drip
+  };
+}
+
+/* ------------------- Charting ------------------- */
+let chart = null;
+function buildChart(labels, datasets){
+  const ctx = document.getElementById('mainChart').getContext('2d');
+  if(chart) chart.destroy();
+  chart = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      interaction:{mode:'index', intersect:false},
+      plugins:{
+        legend:{labels:{usePointStyle:true}},
+        tooltip:{enabled:true}
+      },
+      scales:{
+        y:{ beginAtZero:false, ticks:{maxTicksLimit:10} }
+      },
+      elements:{
+        line:{tension:0.12}
+      }
+    }
+  });
+}
+
+/* ------------------- Render loop ------------------- */
+function renderAll(pushUrl=true){
+  const s = getState();
+  if(pushUrl) pushStateToUrl();
+
+  // build labels
+  const weeks = s.weeks|0;
+  const labels = Array.from({length:weeks+1},(_,i)=> i);
+
+  // simulate A
+  const A = simulate({
+    nav0: s.a_nav0,
+    nav_decay_pct: s.a_nav_decay,
+    dist_pct: s.a_dist_pct,
+    dist_decay_pct: s.a_dist_decay,
+    decouple: s.a_decouple,
+    dist_abs: s.a_dist_abs,
+    weeks: s.weeks,
+    start_shares: s.start_shares,
+    drip_mode: s.drip_mode
+  });
+
+  const B = simulate({
+    nav0: s.b_nav0,
+    nav_decay_pct: s.b_nav_decay,
+    dist_pct: s.b_dist_pct,
+    dist_decay_pct: s.b_dist_decay,
+    decouple: s.b_decouple,
+    dist_abs: s.b_dist_abs,
+    weeks: s.weeks,
+    start_shares: s.start_shares,
+    drip_mode: s.drip_mode
+  });
+
+  // Compose datasets: NAV dashed lines (thin, no points), cumulative distro filled areas, DRIP curve (no fill), portfolio value lines
+  const datasets = [];
+
+  // NAV lines (dashed)
+  datasets.push({
+    label: 'A NAV',
+    data: A.nav,
+    borderColor: 'rgba(54,162,235,1)',
+    borderDash:[6,6],
+    borderWidth:1,
+    pointRadius:0,
+    fill:false,
+    yAxisID: 'y'
+  });
+  datasets.push({
+    label: 'B NAV',
+    data: B.nav,
+    borderColor: 'rgba(255,99,132,1)',
+    borderDash:[6,6],
+    borderWidth:1,
+    pointRadius:0,
+    fill:false
+  });
+
+  // cumulative distribution (filled area) - use cumulative_cash
+  datasets.push({
+    label: 'A cumulative distrib (cash)',
+    data: A.cumulative_cash,
+    borderColor: 'rgba(54,162,235,1)',
+    backgroundColor: 'rgba(54,162,235,0.12)',
+    fill: true,
+    pointRadius:0,
+    borderWidth:1
+  });
+  datasets.push({
+    label: 'B cumulative distrib (cash)',
+    data: B.cumulative_cash,
+    borderColor: 'rgba(255,99,132,1)',
+    backgroundColor: 'rgba(255,99,132,0.12)',
+    fill: true,
+    pointRadius:0,
+    borderWidth:1
+  });
+
+  // DRIP portfolio value (line no fill). For legend square empty, Chart.js doesn't support hollow squares easily,
+  // but we'll use a square pointStyle and set backgroundColor to transparent for those two legend entries.
+  datasets.push({
+    label: 'A portfolio value (DRIP)',
+    data: A.portfolio_value_drip,
+    borderColor: 'rgba(54,162,235,1)',
+    backgroundColor: 'rgba(54,162,235,0.0)',
+    fill: false,
+    pointStyle: 'rect',
+    pointRadius:0,
+    borderWidth:1.5
+  });
+  datasets.push({
+    label: 'B portfolio value (DRIP)',
+    data: B.portfolio_value_drip,
+    borderColor: 'rgba(255,99,132,1)',
+    backgroundColor: 'rgba(255,99,132,0.0)',
+    fill: false,
+    pointStyle: 'rect',
+    pointRadius:0,
+    borderWidth:1.5
+  });
+
+  // portfolio value without reinvest (cash value + NAV*start_shares) (thin line, no circles)
+  datasets.push({
+    label: 'A portfolio (no DRIP)',
+    data: A.portfolio_value_no_drip,
+    borderColor: 'rgba(54,162,235,0.6)',
+    borderWidth:0.8,
+    pointRadius:0,
+    borderDash:[],
+    fill:false
+  });
+  datasets.push({
+    label: 'B portfolio (no DRIP)',
+    data: B.portfolio_value_no_drip,
+    borderColor: 'rgba(255,99,132,0.6)',
+    borderWidth:0.8,
+    pointRadius:0,
+    fill:false
+  });
+
+  // main chart render
+  buildChart(labels, datasets);
+
+  // summary below: totals for final cumulative distributions and total returns
+  const sumArea = el('summaryArea');
+  sumArea.innerHTML = '';
+  function mkMini(title, color, finalCash, finalReinvested, finalValueDrip, finalValueNoDrip){
+    return `<div class="mini card" style="border-left:4px solid ${color}">
+      <div style="font-weight:600">${title}</div>
+      <div class="small">Cumulative distributions (cash): $${finalCash.toFixed(4)}</div>
+      <div class="small">Cumulative distributions (reinvested): $${finalReinvested.toFixed(4)}</div>
+      <div class="small">Final value (DRIP): $${finalValueDrip.toFixed(4)}</div>
+      <div class="small">Final value (no DRIP): $${finalValueNoDrip.toFixed(4)}</div>
+    </div>`;
+  }
+  sumArea.insertAdjacentHTML('beforeend', mkMini('Scenario A','rgba(54,162,235,1)', A.cumulative_cash[weeks], A.cumulative_reinvested[weeks], A.portfolio_value_drip[weeks], A.portfolio_value_no_drip[weeks]));
+  sumArea.insertAdjacentHTML('beforeend', mkMini('Scenario B','rgba(255,99,132,1)', B.cumulative_cash[weeks], B.cumulative_reinvested[weeks], B.portfolio_value_drip[weeks], B.portfolio_value_no_drip[weeks]));
+}
+
+/* ------------------- Events ------------------- */
+const inputs = Array.from(document.querySelectorAll('input, select'));
+inputs.forEach(i=> i.addEventListener('input', ()=> renderAll(true)));
+el('analyze').addEventListener('click', tickerAnalyze);
+el('share').addEventListener('click', ()=>{ pushStateToUrl(); navigator.clipboard.writeText(location.href).then(()=> el('fetch_status').textContent='Link copied to clipboard'); });
+el('reset').addEventListener('click', ()=>{ history.replaceState(null,'', location.pathname); location.reload(); });
+
+loadStateFromUrl();
+renderAll(false);
+
+/* ------------------- Ticker analysis (stub + attempt) ------------------- */
+async function tickerAnalyze(){
+  const t = el('ticker').value.trim();
+  if(!t){ el('fetch_status').textContent='enter ticker'; return; }
+  const from = el('date_from').value, to = el('date_to').value;
+  el('fetch_status').textContent = 'analyzing...';
+  // Attempt to fetch historic NAV & distributions by using a public CSV endpoint (NOTE: CORS may block this in browsers).
+  // [Unverified] I cannot verify this call will succeed due to CORS/APIs requiring keys. If blocked, use a backend proxy to fetch historical ETF NAV and distributions.
+  try{
+    // Example attempt: Yahoo Finance historical data (may be rate-limited or CORS blocked).
+    // We request adjusted close as NAV proxy.
+    const startTs = from ? new Date(from + 'T00:00:00Z').getTime()/1000 : Math.floor((Date.now() - 365*24*3600)/1000);
+    const endTs = to ? new Date(to + 'T23:59:59Z').getTime()/1000 : Math.floor(Date.now()/1000);
+    const url = `https://query1.finance.yahoo.com/v7/finance/download/${encodeURIComponent(t)}?period1=${Math.floor(startTs)}&period2=${Math.floor(endTs)}&interval=1d&events=history&includeAdjustedClose=true`;
+    const res = await fetch(url);
+    if(!res.ok) throw new Error('fetch failed ' + res.status);
+    const txt = await res.text();
+    // Parse CSV: Date,Open,High,Low,Close,Adj Close,Volume
+    const rows = txt.trim().split('\n').slice(1).map(r=>r.split(','));
+    if(rows.length===0) throw new Error('no data');
+    // Convert daily to weekly averages and compute weekly NAV change and proxy yield from dividends (if events=div present, not in download)
+    // We'll compute weekly NAV percent change and approximate distribution% as (daily change negative portion?) — this is heuristic.
+    // [Unverified] This is heuristic: automatic fill requires reliable dividends data; better to use a proper API (AlphaVantage, FMP) or a backend.
+    const weekly = {}; // weekIndex -> array of adjclose
+    rows.forEach(r=>{
+      const date = new Date(r[0]);
+      const weekIdx = Math.floor(date.getTime() / (7*24*3600*1000));
+      const adj = parseFloat(r[5]);
+      if(!isNaN(adj)){
+        if(!weekly[weekIdx]) weekly[weekIdx]=[];
+        weekly[weekIdx].push(adj);
+      }
+    });
+    const weeksArr = Object.keys(weekly).sort();
+    const navs = weeksArr.map(k=> {
+      const arr = weekly[k];
+      return arr.reduce((a,b)=>a+b,0)/arr.length;
+    });
+    // Compute average weekly NAV decay % (mean of percent change)
+    const changes = [];
+    for(let i=1;i<navs.length;i++){
+      changes.push( (navs[i] - navs[i-1]) / navs[i-1] * 100 );
+    }
+    const avgNavDecay = changes.reduce((a,b)=>a+b,0)/changes.length;
+    // For distribution, we can't reliably infer without dividend data. We'll mark as unverified.
+    el('fetch_status').textContent = `Done: filled NAV and NAV decay (avg per-week %.4f). Distribution fields left for user.`.replace('%.4f', avgNavDecay.toFixed(4));
+    // Fill fields: use last nav as initial, and avg decay as nav decay
+    el('a_nav0').value = navs[0].toFixed(4);
+    el('a_nav_decay').value = avgNavDecay.toFixed(4);
+    // Note: we only filled Scenario A for demo; user can toggle to B or both.
+    renderAll(true);
+  }catch(err){
+    console.warn(err);
+    el('fetch_status').textContent = 'I cannot verify this (fetch blocked or API unavailable). Provide CSV or use backend proxy.';
+    // Do not populate fields automatically if unsuccessful.
+  }
+}
+</script>
+</body>
+</html>
 <!DOCTYPE html>
 <html lang="en">
 <head>
