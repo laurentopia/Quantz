@@ -178,34 +178,12 @@
             font-size: 24px;
             font-weight: bold;
             color: #667eea;
-            display: inline-block;
-        }
-        
-        .summary-delta {
-            font-size: 16px;
-            font-weight: bold;
-            margin-left: 10px;
-        }
-        
-        .delta-green {
-            color: #28a745;
-        }
-        
-        .delta-red {
-            color: #dc3545;
         }
         
         .summary-label {
             font-size: 13px;
             color: #777;
             margin-top: 5px;
-        }
-        
-        .summary-row {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-top: 10px;
         }
         
         button {
@@ -273,6 +251,7 @@
             padding: 10px;
             border-radius: 4px;
             font-size: 13px;
+            margin-top: 10px;
         }
         
         .success {
@@ -282,6 +261,7 @@
             padding: 10px;
             border-radius: 4px;
             font-size: 13px;
+            margin-top: 10px;
         }
         
         .loading {
@@ -291,6 +271,7 @@
             padding: 10px;
             border-radius: 4px;
             font-size: 13px;
+            margin-top: 10px;
         }
         
         .proxy-status {
@@ -420,56 +401,36 @@
         <div class="summary">
             <div class="summary-box">
                 <h3>ETF 1 Total Distributions</h3>
-                <div class="summary-row">
-                    <div class="summary-value" id="etf1-total-dist">$0.00</div>
-                    <div class="summary-delta" id="etf1-total-dist-delta"></div>
-                </div>
+                <div class="summary-value" id="etf1-total-dist">$0.00</div>
                 <div class="summary-label">Reinvesting not included</div>
-                <div class="summary-row" style="margin-top: 10px;">
+                <div style="margin-top: 10px;">
                     <div class="summary-label">Final NAV (No DRIP)</div>
-                    <div class="summary-delta" id="etf1-final-nav-delta"></div>
-                </div>
-                <div class="summary-row">
                     <div class="summary-value" id="etf1-final-nav" style="font-size: 18px; color: #555;">$0.00</div>
                 </div>
-                <div class="summary-row" style="margin-top: 10px;">
+                <div style="margin-top: 10px;">
                     <div class="summary-label">Total Return (NAV + Distributions)</div>
-                    <div class="summary-delta" id="etf1-total-return-delta"></div>
-                </div>
-                <div class="summary-row">
                     <div class="summary-value" id="etf1-total-return" style="font-size: 20px; color: #28a745;">$0.00</div>
                 </div>
-                <div class="summary-row" style="margin-top: 10px;">
+                <div style="margin-top: 10px;">
                     <div class="summary-label">DRIP Final Value</div>
-                    <div class="summary-delta" id="etf1-drip-value-delta"></div>
-                </div>
-                <div class="summary-row">
                     <div class="summary-value" id="etf1-drip-value" style="font-size: 18px; color: #dc3545;">$0.00</div>
                 </div>
             </div>
             
             <div class="summary-box">
                 <h3>ETF 2 Total Distributions</h3>
-                <div class="summary-row">
-                    <div class="summary-value" id="etf2-total-dist">$0.00</div>
-                </div>
+                <div class="summary-value" id="etf2-total-dist">$0.00</div>
                 <div class="summary-label">Reinvesting not included</div>
-                <div class="summary-row" style="margin-top: 10px;">
+                <div style="margin-top: 10px;">
                     <div class="summary-label">Final NAV (No DRIP)</div>
-                </div>
-                <div class="summary-row">
                     <div class="summary-value" id="etf2-final-nav" style="font-size: 18px; color: #555;">$0.00</div>
                 </div>
-                <div class="summary-row" style="margin-top: 10px;">
+                <div style="margin-top: 10px;">
                     <div class="summary-label">Total Return (NAV + Distributions)</div>
-                </div>
-                <div class="summary-row">
                     <div class="summary-value" id="etf2-total-return" style="font-size: 20px; color: #28a745;">$0.00</div>
                 </div>
-                <div class="summary-row" style="margin-top: 10px;">
+                <div style="margin-top: 10px;">
                     <div class="summary-label">DRIP Final Value</div>
-                </div>
-                <div class="summary-row">
                     <div class="summary-value" id="etf2-drip-value" style="font-size: 18px; color: #dc3545;">$0.00</div>
                 </div>
             </div>
@@ -564,55 +525,6 @@
         let currentProxyIndex = 0;
         let analysisResults = null;
         
-        // JSONP fetch function
-        function jsonpFetch(url) {
-            return new Promise((resolve, reject) => {
-                const callbackName = 'jsonp_callback_' + Math.round(100000 * Math.random());
-                const script = document.createElement('script');
-                
-                window[callbackName] = function(data) {
-                    delete window[callbackName];
-                    document.body.removeChild(script);
-                    resolve({ ok: true, json: () => Promise.resolve(data) });
-                };
-                
-                script.src = url.replace('callback=?', `callback=${callbackName}`);
-                script.onerror = () => {
-                    delete window[callbackName];
-                    document.body.removeChild(script);
-                    reject(new Error('JSONP failed'));
-                };
-                
-                document.body.appendChild(script);
-            });
-        }
-        
-        // Smart fetch with proxy rotation
-        async function smartFetch(url) {
-            const endpoint = PROXY_ENDPOINTS[currentProxyIndex];
-            console.log(`Trying ${endpoint.name}...`);
-            
-            document.getElementById('proxy-status').textContent = `Using proxy: ${endpoint.name}`;
-            
-            try {
-                if (endpoint.method === 'jsonp') {
-                    return await jsonpFetch(url);
-                } else {
-                    const proxiedUrl = endpoint.url(url);
-                    const response = await fetch(proxiedUrl);
-                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                    return response;
-                }
-            } catch (error) {
-                // Try next proxy
-                currentProxyIndex = (currentProxyIndex + 1) % PROXY_ENDPOINTS.length;
-                if (currentProxyIndex === 0) {
-                    throw new Error('All proxies failed');
-                }
-                return smartFetch(url); // Retry with next proxy
-            }
-        }
-        
         // Main calculation function
         function calculate() {
             const weeks = parseInt(document.getElementById('timeframe').value) || 52;
@@ -705,11 +617,6 @@
             document.getElementById('etf2-total-return').textContent = '$' + (etf2Nav[etf2Nav.length - 1] + cumDist2).toFixed(2);
             document.getElementById('etf2-drip-value').textContent = '$' + dripValue2.toFixed(2);
             
-            updateDelta('etf1-total-dist-delta', cumDist1, cumDist2);
-            updateDelta('etf1-final-nav-delta', etf1Nav[etf1Nav.length - 1], etf2Nav[etf2Nav.length - 1]);
-            updateDelta('etf1-total-return-delta', (etf1Nav[etf1Nav.length - 1] + cumDist1), (etf2Nav[etf2Nav.length - 1] + cumDist2));
-            updateDelta('etf1-drip-value-delta', dripValue1, dripValue2);
-            
             chart.data.labels = labels;
             chart.data.datasets = [
                 {
@@ -780,25 +687,6 @@
             updateURL();
         }
         
-        // Calculate and update delta percentage
-        function updateDelta(elementId, value1, value2) {
-            const deltaElement = document.getElementById(elementId);
-            if (value2 === 0) {
-                deltaElement.textContent = '';
-                return;
-            }
-            
-            const percentage = (value1 / value2) * 100;
-            const rounded = Math.round(percentage);
-            deltaElement.textContent = `${rounded}%`;
-            
-            if (rounded >= 100) {
-                deltaElement.className = 'summary-delta delta-green';
-            } else {
-                deltaElement.className = 'summary-delta delta-red';
-            }
-        }
-        
         // Apply analysis results to ETF
         function applyToETF(etfNumber) {
             if (!analysisResults) return;
@@ -829,7 +717,7 @@
             document.getElementById('ticker').value = ticker;
         }
         
-        // Yahoo Finance analysis
+        // Yahoo Finance analysis with detailed progress
         async function analyzeTicker() {
             const ticker = document.getElementById('ticker').value.toUpperCase();
             const startDate = document.getElementById('start-date').value;
@@ -1029,10 +917,10 @@
         });
         document.getElementById('etf2-abs-dist').addEventListener('input', debouncedCalculate);
         
-        // Set default dates (April 1st 2025 to today)
+        // Set default dates (last 6 months)
         const today = new Date();
-        const startDefault = new Date(2025, 3, 1); // April 1st, 2025
-        document.getElementById('start-date').value = startDefault.toISOString().split('T')[0];
+        const sixMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 6, today.getDate());
+        document.getElementById('start-date').value = sixMonthsAgo.toISOString().split('T')[0];
         document.getElementById('end-date').value = today.toISOString().split('T')[0];
         
         // URL handling
