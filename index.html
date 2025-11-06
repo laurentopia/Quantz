@@ -76,8 +76,50 @@
             opacity: 0.6;
         }
         
+        .ticker-results {
+            margin-top: 15px;
+            padding: 15px;
+            background: #e8f5e9;
+            border-radius: 4px;
+            display: none;
+        }
+        
+        .ticker-results h4 {
+            margin-bottom: 10px;
+            color: #2e7d32;
+        }
+        
+        .result-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+        }
+        
+        .result-item {
+            font-size: 13px;
+        }
+        
+        .result-label {
+            font-weight: bold;
+            color: #555;
+        }
+        
+        .result-value {
+            color: #333;
+        }
+        
+        .initial-investment {
+            margin: 20px 0;
+            text-align: center;
+        }
+        
+        .initial-investment input {
+            width: 200px;
+            margin: 0 auto;
+        }
+        
         .timeframe {
-            margin: 30px 0 20px 0;
+            margin: 20px 0;
             text-align: center;
         }
         
@@ -310,7 +352,7 @@
             <div class="ticker-inputs">
                 <div class="input-group">
                     <label for="ticker">Ticker Symbol</label>
-                    <input type="text" id="ticker" placeholder="e.g., JEPY, QQQY, JEPI, SPY">
+                    <input type="text" id="ticker" placeholder="">
                 </div>
                 <div class="input-group">
                     <label for="start-date">Start Date</label>
@@ -338,7 +380,35 @@
                 <button onclick="applyToETF(1)" disabled id="apply-etf1-btn">→ Apply to ETF 1</button>
                 <button onclick="applyToETF(2)" disabled id="apply-etf2-btn">→ Apply to ETF 2</button>
             </div>
+            <div id="ticker-results" class="ticker-results">
+                <h4>Analysis Results</h4>
+                <div class="result-grid">
+                    <div class="result-item">
+                        <span class="result-label">Initial NAV: </span>
+                        <span class="result-value" id="result-initial-nav">-</span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">NAV Decay: </span>
+                        <span class="result-value" id="result-nav-decay">-</span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">Dist. Rate: </span>
+                        <span class="result-value" id="result-dist-rate">-</span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">Dist. Decay: </span>
+                        <span class="result-value" id="result-dist-decay">-</span>
+                    </div>
+                </div>
+            </div>
             <div class="proxy-status" id="proxy-status"></div>
+        </div>
+        
+        <div class="initial-investment">
+            <div class="input-group">
+                <label for="initial-investment">Initial Investment ($)</label>
+                <input type="number" id="initial-investment" value="10000" step="100">
+            </div>
         </div>
         
         <div class="timeframe">
@@ -650,6 +720,7 @@
             document.getElementById('apply-etf1-btn').disabled = true;
             document.getElementById('apply-etf2-btn').disabled = true;
             analysisResults = null;
+            document.getElementById('ticker-results').style.display = 'none';
             
             calculate();
         }
@@ -668,6 +739,7 @@
             const infoDiv = document.getElementById('ticker-info');
             const successDiv = document.getElementById('ticker-success');
             const loadingDiv = document.getElementById('ticker-loading');
+            const resultsDiv = document.getElementById('ticker-results');
             const analyzeBtn = document.getElementById('analyze-btn');
             const applyBtn1 = document.getElementById('apply-etf1-btn');
             const applyBtn2 = document.getElementById('apply-etf2-btn');
@@ -678,6 +750,7 @@
             analyzeBtn.disabled = true;
             applyBtn1.disabled = true;
             applyBtn2.disabled = true;
+            resultsDiv.style.display = 'none';
             
             if (!ticker || !startDate || !endDate) {
                 errorDiv.textContent = 'Please fill all fields';
@@ -810,12 +883,13 @@
                         }
                     }
                     
-                    // Calculate average distribution rate
-                    if (navAtDivDates.length > 0 && dividendCount > 0) {
-                        avgDistRate = (totalDividends / dividendCount) / 
-                            (navAtDivDates.reduce((a, b) => a + b, 0) / navAtDivDates.length);
-                        avgDistRate = avgDistRate / (weeklyPrices.length / 4); // Convert to weekly
-                    }
+                    // FIX: Calculate proper weekly distribution rate
+                    // totalDividends is total $ amount over the period
+                    // weeklyPrices.length is number of weeks
+                    // Average NAV is mean of weeklyPrices
+                    const avgNav = weeklyPrices.reduce((a, b) => a + b, 0) / weeklyPrices.length;
+                    // Weekly distribution rate = total dividends / (avg nav * weeks)
+                    avgDistRate = totalDividends / (avgNav * weeklyPrices.length);
                     
                     // Calculate distribution decay - improved
                     if (dividendCount >= 4) {
@@ -849,6 +923,13 @@
                     distRate: Math.max(0, Math.min(0.1, avgDistRate)), // Clamp to reasonable range
                     distDecay: distDecay
                 };
+                
+                // Show results
+                document.getElementById('result-initial-nav').textContent = `$${analysisResults.initialNav.toFixed(2)}`;
+                document.getElementById('result-nav-decay').textContent = `${(analysisResults.navDecay * 100).toFixed(2)}%`;
+                document.getElementById('result-dist-rate').textContent = `${(analysisResults.distRate * 100).toFixed(3)}%`;
+                document.getElementById('result-dist-decay').textContent = `${(analysisResults.distDecay * 100).toFixed(2)}%`;
+                resultsDiv.style.display = 'block';
                 
                 // Enable apply buttons
                 applyBtn1.disabled = false;
@@ -885,6 +966,7 @@
         // Main calculation function
         function calculate() {
             const weeks = parseInt(document.getElementById('timeframe').value) || 52;
+            const initialInvestment = parseFloat(document.getElementById('initial-investment').value) || 10000;
             
             // Get ETF1 values
             const etf1 = {
@@ -906,6 +988,10 @@
                 absDist: parseFloat(document.getElementById('etf2-abs-dist').value) || 0
             };
             
+            // Calculate shares based on initial investment
+            const shares1 = initialInvestment / etf1.initialNav;
+            const shares2 = initialInvestment / etf2.initialNav;
+            
             // Generate data
             const labels = [];
             const etf1Nav = [];
@@ -918,14 +1004,12 @@
             // ETF1 calculations
             let nav1 = etf1.initialNav;
             let cumDist1 = 0;
-            let shares1 = 1;
-            let dripValue1 = etf1.initialNav;
+            let dripValue1 = initialInvestment;
             
             // ETF2 calculations
             let nav2 = etf2.initialNav;
             let cumDist2 = 0;
-            let shares2 = 1;
-            let dripValue2 = etf2.initialNav;
+            let dripValue2 = initialInvestment;
             
             for (let w = 0; w <= weeks; w++) {
                 labels.push(w);
@@ -954,17 +1038,21 @@
                 }
                 
                 // Update cumulative distributions
-                cumDist1 += dist1;
-                cumDist2 += dist2;
+                cumDist1 += dist1 * shares1;
+                cumDist2 += dist2 * shares2;
                 etf1CumDist.push(cumDist1);
                 etf2CumDist.push(cumDist2);
                 
                 // DRIP calculations
-                if (nav1 > 0) shares1 += dist1 / nav1;
-                if (nav2 > 0) shares2 += dist2 / nav2;
+                const newShares1 = dist1 * shares1 / nav1;
+                const newShares2 = dist2 * shares2 / nav2;
                 
-                dripValue1 = shares1 * nav1;
-                dripValue2 = shares2 * nav2;
+                dripValue1 = (shares1 + newShares1) * nav1;
+                dripValue2 = (shares2 + newShares2) * nav2;
+                
+                // Update shares for next week
+                shares1 += newShares1;
+                shares2 += newShares2;
                 
                 etf1Drip.push(dripValue1);
                 etf2Drip.push(dripValue2);
@@ -977,19 +1065,19 @@
             // Calculate deltas
             const deltaDist = cumDist2 > 0 ? (cumDist1 / cumDist2 * 100) : 0;
             const deltaNav = etf2Nav[etf2Nav.length - 1] > 0 ? (etf1Nav[etf1Nav.length - 1] / etf2Nav[etf2Nav.length - 1] * 100) : 0;
-            const deltaTotal = (etf2Nav[etf2Nav.length - 1] + cumDist2) > 0 ? 
-                ((etf1Nav[etf1Nav.length - 1] + cumDist1) / (etf2Nav[etf2Nav.length - 1] + cumDist2) * 100) : 0;
+            const deltaTotal = (etf2Nav[etf2Nav.length - 1] * shares2 + cumDist2) > 0 ? 
+                ((etf1Nav[etf1Nav.length - 1] * shares1 + cumDist1) / (etf2Nav[etf2Nav.length - 1] * shares2 + cumDist2) * 100) : 0;
             const deltaDrip = dripValue2 > 0 ? (dripValue1 / dripValue2 * 100) : 0;
             
-            // Update summary
+            // Update summary - scale by shares for NAV displays
             document.getElementById('etf1-total-dist').textContent = '$' + cumDist1.toFixed(2);
-            document.getElementById('etf1-final-nav').textContent = '$' + etf1Nav[etf1Nav.length - 1].toFixed(2);
-            document.getElementById('etf1-total-return').textContent = '$' + (etf1Nav[etf1Nav.length - 1] + cumDist1).toFixed(2);
+            document.getElementById('etf1-final-nav').textContent = '$' + (etf1Nav[etf1Nav.length - 1] * shares1).toFixed(2);
+            document.getElementById('etf1-total-return').textContent = '$' + (etf1Nav[etf1Nav.length - 1] * shares1 + cumDist1).toFixed(2);
             document.getElementById('etf1-drip-value').textContent = '$' + dripValue1.toFixed(2);
             
             document.getElementById('etf2-total-dist').textContent = '$' + cumDist2.toFixed(2);
-            document.getElementById('etf2-final-nav').textContent = '$' + etf2Nav[etf2Nav.length - 1].toFixed(2);
-            document.getElementById('etf2-total-return').textContent = '$' + (etf2Nav[etf2Nav.length - 1] + cumDist2).toFixed(2);
+            document.getElementById('etf2-final-nav').textContent = '$' + (etf2Nav[etf2Nav.length - 1] * shares2).toFixed(2);
+            document.getElementById('etf2-total-return').textContent = '$' + (etf2Nav[etf2Nav.length - 1] * shares2 + cumDist2).toFixed(2);
             document.getElementById('etf2-drip-value').textContent = '$' + dripValue2.toFixed(2);
             
             // Update deltas
@@ -1014,7 +1102,7 @@
             deltaDripEl.textContent = formatDelta(deltaDrip);
             deltaDripEl.className = 'summary-value ' + (deltaDrip >= 100 ? 'delta-positive' : 'delta-negative');
             
-            // Update chart
+            // Update chart - these values are per-share for proper comparison
             chart.data.labels = labels;
             chart.data.datasets = [
                 {
@@ -1089,6 +1177,7 @@
         const debouncedCalculate = debounce(calculate, 100);
         
         document.getElementById('timeframe').addEventListener('input', debouncedCalculate);
+        document.getElementById('initial-investment').addEventListener('input', debouncedCalculate);
         
         // ETF1 listeners
         document.getElementById('etf1-nav').addEventListener('input', debouncedCalculate);
@@ -1139,6 +1228,7 @@
             const params = new URLSearchParams();
             
             params.set('weeks', document.getElementById('timeframe').value);
+            params.set('investment', document.getElementById('initial-investment').value);
             params.set('etf1-nav', document.getElementById('etf1-nav').value);
             params.set('etf1-nav-decay', document.getElementById('etf1-nav-decay').value);
             params.set('etf1-dist-rate', document.getElementById('etf1-dist-rate').value);
@@ -1163,6 +1253,7 @@
             if (params.toString() === '') return;
             
             if (params.has('weeks')) document.getElementById('timeframe').value = params.get('weeks');
+            if (params.has('investment')) document.getElementById('initial-investment').value = params.get('investment');
             if (params.has('etf1-nav')) document.getElementById('etf1-nav').value = params.get('etf1-nav');
             if (params.has('etf1-nav-decay')) document.getElementById('etf1-nav-decay').value = params.get('etf1-nav-decay');
             if (params.has('etf1-dist-rate')) document.getElementById('etf1-dist-rate').value = params.get('etf1-dist-rate');
