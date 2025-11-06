@@ -1,2 +1,0 @@
-# Quantz
-various quants scripts
