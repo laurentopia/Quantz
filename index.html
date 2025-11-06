@@ -3,816 +3,315 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ETF Distribution & NAV Comparator</title>
+    <title>High Yield ETF Simulator</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-        }
-        
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            padding: 30px;
-        }
-        
-        h1 {
-            text-align: center;
-            color: #333;
-            margin-bottom: 30px;
-            font-size: 28px;
-        }
-        
-        .controls {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 30px;
-            margin-bottom: 30px;
-        }
-        
-        .etf-panel {
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 20px;
-            border: 2px solid #e0e0e0;
-            transition: border-color 0.3s;
-        }
-        
-        .etf-panel:hover {
-            border-color: #667eea;
-        }
-        
-        .etf-panel h2 {
-            color: #333;
-            margin-bottom: 15px;
-            font-size: 20px;
-        }
-        
-        .input-group {
-            margin-bottom: 15px;
-        }
-        
-        label {
-            display: block;
-            color: #555;
-            font-size: 13px;
-            font-weight: 600;
-            margin-bottom: 5px;
-        }
-        
-        input {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 14px;
-            transition: border-color 0.3s;
-        }
-        
-        input:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-        
-        .timeframe {
-            margin-bottom: 20px;
-            text-align: center;
-        }
-        
-        .timeframe input {
-            width: 200px;
-            margin: 0 auto;
-        }
-        
-        .chart-container {
-            position: relative;
-            height: 500px;
-            margin-bottom: 30px;
-        }
-        
-        .summary {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 30px;
-            margin-top: 30px;
-        }
-        
-        .summary-box {
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 20px;
-            text-align: center;
-        }
-        
-        .summary-box h3 {
-            color: #333;
-            margin-bottom: 10px;
-            font-size: 18px;
-        }
-        
-        .summary-value {
-            font-size: 24px;
-            font-weight: bold;
-            color: #667eea;
-        }
-        
-        .summary-label {
-            font-size: 13px;
-            color: #777;
-            margin-top: 5px;
-        }
-        
-        .ticker-tool {
-            margin-top: 40px;
-            padding: 20px;
-            background: #f0f0f0;
-            border-radius: 8px;
-        }
-        
-        .ticker-tool h3 {
-            margin-bottom: 15px;
-            color: #333;
-        }
-        
-        .ticker-inputs {
-            display: grid;
-            grid-template-columns: 2fr 1fr 1fr 1fr;
-            gap: 10px;
-            align-items: end;
-        }
-        
-        .ticker-inputs input, .ticker-inputs button {
-            margin-bottom: 0;
-        }
-        
-        button {
-            padding: 10px 20px;
-            background: #667eea;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: 600;
-            transition: background 0.3s;
-        }
-        
-        button:hover {
-            background: #5a6fd8;
-        }
-        
-        .decouple-toggle {
-            margin-bottom: 15px;
-        }
-        
-        .decouple-toggle label {
-            display: flex;
-            align-items: center;
-            cursor: pointer;
-        }
-        
-        .decouple-toggle input[type="checkbox"] {
-            width: auto;
-            margin-right: 10px;
-        }
-        
-        .hidden {
-            display: none;
-        }
-        
-        .url-share {
-            margin-top: 20px;
-            text-align: center;
-        }
-        
-        .url-share button {
-            background: #28a745;
-        }
-        
-        .url-share button:hover {
-            background: #218838;
-        }
-        
-        .error {
-            color: #dc3545;
-            font-size: 14px;
-            margin-top: 10px;
-        }
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .group { border: 1px solid #ccc; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        input { margin: 5px; padding: 3px; }
+        label { display: block; margin: 5px 0; }
+        #chart { height: 400px; position: relative; margin: 20px 0; }
+        #summary { margin-top: 20px; padding: 10px; background: #f9f9f9; border-radius: 5px; }
+        #analyzer { border: 1px solid #ccc; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        button { padding: 5px 10px; background: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer; }
+        button:hover { background: #0056b3; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>ETF Distribution & NAV Comparator</h1>
-        
-        <div class="timeframe">
-            <div class="input-group">
-                <label for="timeframe">Time Frame (Weeks)</label>
-                <input type="number" id="timeframe" value="52" min="1" max="520">
-            </div>
+    <h1>High Yield ETF Simulator</h1>
+    <p>Simulate and compare two ETFs over time (weeks). Cumulative distributions are filled areas. NAV curves are dashed thin lines. DRIP totals are solid lines (independent of yield when coupled). Totals assume $1 share initial investment scaled to initial NAV.</p>
+
+    <div class="group">
+        <h3>ETF 1</h3>
+        <label>Initial NAV ($): <input id="nav1" type="number" step="0.01" value="10"></label>
+        <label>NAV Decay Rate (%/week): <input id="dnav1" type="number" step="0.01" value="0.5"></label>
+        <label><input id="dec1" type="checkbox"> Decoupled Distribution (absolute $/week, independent of NAV)</label>
+        <div id="yielddiv1">
+            <label>Distribution Yield (%/week): <input id="yield1" type="number" step="0.01" value="1"></label>
         </div>
-        
-        <div class="controls">
-            <div class="etf-panel" id="etf1-panel">
-                <h2>ETF 1</h2>
-                <div class="decouple-toggle">
-                    <label>
-                        <input type="checkbox" id="etf1-decouple">
-                        Decouple Yield from NAV
-                    </label>
-                </div>
-                <div class="input-group">
-                    <label for="etf1-nav">Initial NAV ($)</label>
-                    <input type="number" id="etf1-nav" value="100" step="0.01">
-                </div>
-                <div class="input-group">
-                    <label for="etf1-nav-decay">NAV Decay Rate (%/week)</label>
-                    <input type="number" id="etf1-nav-decay" value="0.5" step="0.01">
-                </div>
-                <div class="input-group">
-                    <label for="etf1-dist-rate">Distribution Rate (%/week)</label>
-                    <input type="number" id="etf1-dist-rate" value="2.0" step="0.01">
-                </div>
-                <div class="input-group" id="etf1-abs-dist-group" class="hidden">
-                    <label for="etf1-abs-dist">Absolute Distribution ($/week)</label>
-                    <input type="number" id="etf1-abs-dist" value="2.0" step="0.01">
-                </div>
-                <div class="input-group">
-                    <label for="etf1-dist-decay">Distribution Decay Rate (%/week)</label>
-                    <input type="number" id="etf1-dist-decay" value="0.1" step="0.01">
-                </div>
-            </div>
-            
-            <div class="etf-panel" id="etf2-panel">
-                <h2>ETF 2</h2>
-                <div class="decouple-toggle">
-                    <label>
-                        <input type="checkbox" id="etf2-decouple">
-                        Decouple Yield from NAV
-                    </label>
-                </div>
-                <div class="input-group">
-                    <label for="etf2-nav">Initial NAV ($)</label>
-                    <input type="number" id="etf2-nav" value="100" step="0.01">
-                </div>
-                <div class="input-group">
-                    <label for="etf2-nav-decay">NAV Decay Rate (%/week)</label>
-                    <input type="number" id="etf2-nav-decay" value="0.1" step="0.01">
-                </div>
-                <div class="input-group">
-                    <label for="etf2-dist-rate">Distribution Rate (%/week)</label>
-                    <input type="number" id="etf2-dist-rate" value="1.0" step="0.01">
-                </div>
-                <div class="input-group hidden" id="etf2-abs-dist-group">
-                    <label for="etf2-abs-dist">Absolute Distribution ($/week)</label>
-                    <input type="number" id="etf2-abs-dist" value="1.0" step="0.01">
-                </div>
-                <div class="input-group">
-                    <label for="etf2-dist-decay">Distribution Decay Rate (%/week)</label>
-                    <input type="number" id="etf2-dist-decay" value="0.0" step="0.01">
-                </div>
-            </div>
+        <div id="distdiv1" style="display: none;">
+            <label>Initial Distribution ($/week): <input id="dist1" type="number" step="0.01" value="0.1"></label>
         </div>
-        
-        <div class="chart-container">
-            <canvas id="chart"></canvas>
-        </div>
-        
-        <div class="summary">
-            <div class="summary-box">
-                <h3>ETF 1 Total Distributions</h3>
-                <div class="summary-value" id="etf1-total-dist">$0.00</div>
-                <div class="summary-label">Reinvesting not included</div>
-                <div style="margin-top: 10px;">
-                    <div class="summary-label">Final NAV (No DRIP)</div>
-                    <div class="summary-value" id="etf1-final-nav" style="font-size: 18px; color: #555;">$0.00</div>
-                </div>
-                <div style="margin-top: 10px;">
-                    <div class="summary-label">Total Return (NAV + Distributions)</div>
-                    <div class="summary-value" id="etf1-total-return" style="font-size: 20px; color: #28a745;">$0.00</div>
-                </div>
-                <div style="margin-top: 10px;">
-                    <div class="summary-label">DRIP Final Value</div>
-                    <div class="summary-value" id="etf1-drip-value" style="font-size: 18px; color: #dc3545;">$0.00</div>
-                </div>
-            </div>
-            
-            <div class="summary-box">
-                <h3>ETF 2 Total Distributions</h3>
-                <div class="summary-value" id="etf2-total-dist">$0.00</div>
-                <div class="summary-label">Reinvesting not included</div>
-                <div style="margin-top: 10px;">
-                    <div class="summary-label">Final NAV (No DRIP)</div>
-                    <div class="summary-value" id="etf2-final-nav" style="font-size: 18px; color: #555;">$0.00</div>
-                </div>
-                <div style="margin-top: 10px;">
-                    <div class="summary-label">Total Return (NAV + Distributions)</div>
-                    <div class="summary-value" id="etf2-total-return" style="font-size: 20px; color: #28a745;">$0.00</div>
-                </div>
-                <div style="margin-top: 10px;">
-                    <div class="summary-label">DRIP Final Value</div>
-                    <div class="summary-value" id="etf2-drip-value" style="font-size: 18px; color: #dc3545;">$0.00</div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="ticker-tool">
-            <h3>Automatic Ticker Analysis (Beta)</h3>
-            <div id="ticker-error" class="error"></div>
-            <div class="ticker-inputs">
-                <div class="input-group">
-                    <label for="ticker">Ticker Symbol</label>
-                    <input type="text" id="ticker" placeholder="e.g., JEPY, QQQY">
-                </div>
-                <div class="input-group">
-                    <label for="start-date">Start Date</label>
-                    <input type="date" id="start-date">
-                </div>
-                <div class="input-group">
-                    <label for="end-date">End Date</label>
-                    <input type="date" id="end-date">
-                </div>
-                <button onclick="analyzeTicker()">Analyze Ticker</button>
-            </div>
-            <div style="margin-top: 10px; font-size: 12px; color: #666;">
-                Note: Uses public Yahoo Finance data. May not work for all tickers. Manual verification recommended.
-            </div>
-        </div>
-        
-        <div class="url-share">
-            <button onclick="shareSimulation()">Copy Share URL</button>
-            <div id="url-status" style="margin-top: 10px; font-size: 14px; color: #28a745;"></div>
-        </div>
+        <label>Distribution Decay Rate (%/week): <input id="dy1" type="number" step="0.01" value="0"></label>
     </div>
-    
+
+    <div class="group">
+        <h3>ETF 2</h3>
+        <label>Initial NAV ($): <input id="nav2" type="number" step="0.01" value="10"></label>
+        <label>NAV Decay Rate (%/week): <input id="dnav2" type="number" step="0.01" value="0.2"></label>
+        <label><input id="dec2" type="checkbox"> Decoupled Distribution (absolute $/week, independent of NAV)</label>
+        <div id="yielddiv2">
+            <label>Distribution Yield (%/week): <input id="yield2" type="number" step="0.01" value="0.5"></label>
+        </div>
+        <div id="distdiv2" style="display: none;">
+            <label>Initial Distribution ($/week): <input id="dist2" type="number" step="0.01" value="0.05"></label>
+        </div>
+        <label>Distribution Decay Rate (%/week): <input id="dy2" type="number" step="0.01" value="0"></label>
+    </div>
+
+    <label>Time Frame (Weeks): <input id="weeks" type="number" min="1" value="52"></label>
+
+    <div id="chart"><canvas id="myChart"></canvas></div>
+
+    <div id="summary"></div>
+
+    <div id="analyzer">
+        <h3>Analyze Ticker (Fills ETF 1)</h3>
+        <label>Ticker: <input id="ticker" type="text" value="ULTY"></label>
+        <label>Start Date: <input id="startdate" type="date" value="2024-01-01"></label>
+        <label>End Date: <input id="enddate" type="date" value="2025-11-01"></label>
+        <button onclick="analyze()">Analyze</button>
+        <p><small>Averages NAV decay (geometric), distribution yield (total div / avg NAV / weeks). Sets dist decay to 0. Uses Yahoo Finance data.</small></p>
+    </div>
+
     <script>
-        // Initialize chart
-        const ctx = document.getElementById('chart').getContext('2d');
-        const chart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: [],
-                datasets: []
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                interaction: {
-                    mode: 'index',
-                    intersect: false,
-                },
-                plugins: {
-                    legend: {
-                        position: 'top',
-                    },
-                    title: {
-                        display: true,
-                        text: 'ETF Performance Comparison'
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                return context.dataset.label + ': $' + context.parsed.y.toFixed(2);
-                            }
-                        }
-                    }
-                },
-                scales: {
-                    x: {
-                        display: true,
-                        title: {
-                            display: true,
-                            text: 'Weeks'
-                        }
-                    },
-                    y: {
-                        display: true,
-                        title: {
-                            display: true,
-                            text: 'Value ($)'
-                        }
-                    }
-                }
-            }
-        });
-        
-        // Colors
-        const colors = {
-            etf1: {
-                nav: 'rgb(54, 162, 235)',
-                dist: 'rgba(54, 162, 235, 0.5)',
-                drip: 'rgb(54, 162, 235)'
-            },
-            etf2: {
-                nav: 'rgb(255, 99, 132)',
-                dist: 'rgba(255, 99, 132, 0.5)',
-                drip: 'rgb(255, 99, 132)'
-            }
-        };
-        
-        // Utility functions
-        function debounce(func, wait) {
-            let timeout;
-            return function executedFunction(...args) {
-                const later = () => {
-                    clearTimeout(timeout);
-                    func(...args);
-                };
-                clearTimeout(timeout);
-                timeout = setTimeout(later, wait);
-            };
-        }
-        
-        // Main calculation function
-        function calculate() {
-            const weeks = parseInt(document.getElementById('timeframe').value) || 52;
-            
-            // Get ETF1 values
-            const etf1 = {
-                initialNav: parseFloat(document.getElementById('etf1-nav').value) || 100,
-                navDecay: parseFloat(document.getElementById('etf1-nav-decay').value) / 100 || 0,
-                distRate: parseFloat(document.getElementById('etf1-dist-rate').value) / 100 || 0,
-                distDecay: parseFloat(document.getElementById('etf1-dist-decay').value) / 100 || 0,
-                decoupled: document.getElementById('etf1-decouple').checked,
-                absDist: parseFloat(document.getElementById('etf1-abs-dist').value) || 0
-            };
-            
-            // Get ETF2 values
-            const etf2 = {
-                initialNav: parseFloat(document.getElementById('etf2-nav').value) || 100,
-                navDecay: parseFloat(document.getElementById('etf2-nav-decay').value) / 100 || 0,
-                distRate: parseFloat(document.getElementById('etf2-dist-rate').value) / 100 || 0,
-                distDecay: parseFloat(document.getElementById('etf2-dist-decay').value) / 100 || 0,
-                decoupled: document.getElementById('etf2-decouple').checked,
-                absDist: parseFloat(document.getElementById('etf2-abs-dist').value) || 0
-            };
-            
-            // Generate data
-            const labels = [];
-            const etf1Nav = [];
-            const etf1CumDist = [];
-            const etf1Drip = [];
-            const etf2Nav = [];
-            const etf2CumDist = [];
-            const etf2Drip = [];
-            
-            // ETF1 calculations
-            let nav1 = etf1.initialNav;
-            let cumDist1 = 0;
-            let shares1 = 1; // Normalized to 1 share initially
-            let dripValue1 = etf1.initialNav; // Initial investment
-            
-            // ETF2 calculations
-            let nav2 = etf2.initialNav;
-            let cumDist2 = 0;
-            let shares2 = 1;
-            let dripValue2 = etf2.initialNav;
-            
-            for (let w = 0; w <= weeks; w++) {
-                labels.push(w);
-                
-                // Store current NAV
-                etf1Nav.push(nav1);
-                etf2Nav.push(nav2);
-                
-                // Calculate distributions for this week
-                let dist1;
-                if (etf1.decoupled) {
-                    const currentAbsDist = etf1.absDist * Math.pow(1 - etf1.distDecay, w);
-                    dist1 = currentAbsDist;
+        let chart;
+        const ctx = document.getElementById('myChart').getContext('2d');
+
+        function compute(initial_nav, d_nav, initial_y, d_y, weeks, decoupled, initial_dist) {
+            let navs = [initial_nav];
+            let cum_dists = [0];
+            let drip_totals = [initial_nav];
+            let current_nav = initial_nav;
+            let shares = 1.0;
+            for (let t = 1; t <= weeks; t++) {
+                current_nav *= (1 - d_nav);
+                let y_factor = Math.pow(1 - d_y, t - 1);
+                let dist_t;
+                if (decoupled) {
+                    dist_t = initial_dist * y_factor;
                 } else {
-                    const currentDistRate = etf1.distRate * Math.pow(1 - etf1.distDecay, w);
-                    dist1 = nav1 * currentDistRate;
+                    let y_t = initial_y * y_factor;
+                    dist_t = current_nav * y_t;
                 }
-                
-                let dist2;
-                if (etf2.decoupled) {
-                    const currentAbsDist = etf2.absDist * Math.pow(1 - etf2.distDecay, w);
-                    dist2 = currentAbsDist;
+                let cum_dist = cum_dists[cum_dists.length - 1] + dist_t;
+                cum_dists.push(cum_dist);
+                let nav_after = decoupled ? current_nav : current_nav - dist_t;
+                navs.push(nav_after);
+                let total_drip;
+                if (decoupled) {
+                    let dist_cash = dist_t;
+                    let add_shares = dist_cash / nav_after;
+                    shares += add_shares;
+                    total_drip = shares * nav_after;
                 } else {
-                    const currentDistRate = etf2.distRate * Math.pow(1 - etf2.distDecay, w);
-                    dist2 = nav2 * currentDistRate;
+                    total_drip = initial_nav * Math.pow(1 - d_nav, t);
                 }
-                
-                // Update cumulative distributions
-                cumDist1 += dist1;
-                cumDist2 += dist2;
-                etf1CumDist.push(cumDist1);
-                etf2CumDist.push(cumDist2);
-                
-                // DRIP calculations
-                // Reinvest distribution to buy more shares at current NAV
-                shares1 += dist1 / nav1;
-                shares2 += dist2 / nav2;
-                
-                // Update DRIP values (shares * current NAV)
-                dripValue1 = shares1 * nav1;
-                dripValue2 = shares2 * nav2;
-                
-                etf1Drip.push(dripValue1);
-                etf2Drip.push(dripValue2);
-                
-                // Update NAV for next week
-                nav1 *= (1 - etf1.navDecay);
-                nav2 *= (1 - etf2.navDecay);
+                drip_totals.push(total_drip);
+                current_nav = nav_after;
             }
-            
-            // Update summary
-            document.getElementById('etf1-total-dist').textContent = '$' + cumDist1.toFixed(2);
-            document.getElementById('etf1-final-nav').textContent = '$' + etf1Nav[etf1Nav.length - 1].toFixed(2);
-            document.getElementById('etf1-total-return').textContent = '$' + (etf1Nav[etf1Nav.length - 1] + cumDist1).toFixed(2);
-            document.getElementById('etf1-drip-value').textContent = '$' + dripValue1.toFixed(2);
-            
-            document.getElementById('etf2-total-dist').textContent = '$' + cumDist2.toFixed(2);
-            document.getElementById('etf2-final-nav').textContent = '$' + etf2Nav[etf2Nav.length - 1].toFixed(2);
-            document.getElementById('etf2-total-return').textContent = '$' + (etf2Nav[etf2Nav.length - 1] + cumDist2).toFixed(2);
-            document.getElementById('etf2-drip-value').textContent = '$' + dripValue2.toFixed(2);
-            
-            // Update chart
-            chart.data.labels = labels;
-            chart.data.datasets = [
-                // ETF1 NAV (dashed)
-                {
-                    label: 'ETF 1 NAV',
-                    data: etf1Nav,
-                    borderColor: colors.etf1.nav,
-                    backgroundColor: 'transparent',
-                    borderWidth: 2,
-                    borderDash: [5, 5],
-                    pointRadius: 0,
-                    yAxisID: 'y',
-                },
-                // ETF1 Cumulative Distribution (filled area)
-                {
-                    label: 'ETF 1 Distributions',
-                    data: etf1CumDist,
-                    borderColor: colors.etf1.dist,
-                    backgroundColor: colors.etf1.dist,
-                    fill: true,
-                    tension: 0.1,
-                    pointRadius: 0,
-                    yAxisID: 'y',
-                },
-                // ETF1 DRIP (empty squares)
-                {
-                    label: 'ETF 1 DRIP',
-                    data: etf1Drip,
-                    borderColor: colors.etf1.drip,
-                    backgroundColor: 'transparent',
-                    pointStyle: 'rect',
-                    pointRadius: 4,
-                    pointHoverRadius: 6,
-                    borderWidth: 2,
-                    yAxisID: 'y',
-                },
-                // ETF2 NAV (dashed)
-                {
-                    label: 'ETF 2 NAV',
-                    data: etf2Nav,
-                    borderColor: colors.etf2.nav,
-                    backgroundColor: 'transparent',
-                    borderWidth: 2,
-                    borderDash: [5, 5],
-                    pointRadius: 0,
-                    yAxisID: 'y',
-                },
-                // ETF2 Cumulative Distribution (filled area)
-                {
-                    label: 'ETF 2 Distributions',
-                    data: etf2CumDist,
-                    borderColor: colors.etf2.dist,
-                    backgroundColor: colors.etf2.dist,
-                    fill: true,
-                    tension: 0.1,
-                    pointRadius: 0,
-                    yAxisID: 'y',
-                },
-                // ETF2 DRIP (empty squares)
-                {
-                    label: 'ETF 2 DRIP',
-                    data: etf2Drip,
-                    borderColor: colors.etf2.drip,
-                    backgroundColor: 'transparent',
-                    pointStyle: 'rect',
-                    pointRadius: 4,
-                    pointHoverRadius: 6,
-                    borderWidth: 2,
-                    yAxisID: 'y',
-                }
-            ];
-            
-            chart.update();
-            updateURL();
+            let final_no_drip = navs[navs.length - 1] + cum_dists[cum_dists.length - 1];
+            let final_drip = drip_totals[drip_totals.length - 1];
+            let final_cum = cum_dists[cum_dists.length - 1];
+            return { navs, cum_dists, drip_totals, final_no_drip, final_drip, final_cum_dist: final_cum };
         }
-        
-        // Debounced calculation
-        const debouncedCalculate = debounce(calculate, 100);
-        
-        // Event listeners
-        document.getElementById('timeframe').addEventListener('input', debouncedCalculate);
-        
-        // ETF1 listeners
-        document.getElementById('etf1-nav').addEventListener('input', debouncedCalculate);
-        document.getElementById('etf1-nav-decay').addEventListener('input', debouncedCalculate);
-        document.getElementById('etf1-dist-rate').addEventListener('input', debouncedCalculate);
-        document.getElementById('etf1-dist-decay').addEventListener('input', debouncedCalculate);
-        document.getElementById('etf1-decouple').addEventListener('change', function() {
-            const group = document.getElementById('etf1-abs-dist-group');
-            if (this.checked) {
-                group.classList.remove('hidden');
-                document.getElementById('etf1-dist-rate-group').style.display = 'none';
-            } else {
-                group.classList.add('hidden');
-                document.getElementById('etf1-dist-rate-group').style.display = 'block';
-            }
-            debouncedCalculate();
-        });
-        document.getElementById('etf1-abs-dist').addEventListener('input', debouncedCalculate);
-        
-        // ETF2 listeners
-        document.getElementById('etf2-nav').addEventListener('input', debouncedCalculate);
-        document.getElementById('etf2-nav-decay').addEventListener('input', debouncedCalculate);
-        document.getElementById('etf2-dist-rate').addEventListener('input', debouncedCalculate);
-        document.getElementById('etf2-dist-decay').addEventListener('input', debouncedCalculate);
-        document.getElementById('etf2-decouple').addEventListener('change', function() {
-            const group = document.getElementById('etf2-abs-dist-group');
-            if (this.checked) {
-                group.classList.remove('hidden');
-                document.getElementById('etf2-dist-rate-group').style.display = 'none';
-            } else {
-                group.classList.add('hidden');
-                document.getElementById('etf2-dist-rate-group').style.display = 'block';
-            }
-            debouncedCalculate();
-        });
-        document.getElementById('etf2-abs-dist').addEventListener('input', debouncedCalculate);
-        
-        // Ticker analysis
-        async function analyzeTicker() {
-            const ticker = document.getElementById('ticker').value.toUpperCase();
-            const startDate = document.getElementById('start-date').value;
-            const endDate = document.getElementById('end-date').value;
-            const errorDiv = document.getElementById('ticker-error');
-            
-            errorDiv.textContent = '';
-            
-            if (!ticker || !startDate || !endDate) {
-                errorDiv.textContent = 'Please fill all fields';
-                return;
-            }
-            
-            try {
-                // Yahoo Finance API endpoints
-                // 1. Get price data (as proxy for NAV)
-                const priceUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?period1=${new Date(startDate).getTime()/1000}&period2=${new Date(endDate).getTime()/1000}&interval=1d`;
-                
-                // 2. Get dividend/distribution data
-                const divUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?period1=${new Date(startDate).getTime()/1000}&period2=${new Date(endDate).getTime()/1000}&interval=1d&events=div`;
-                
-                const [priceRes, divRes] = await Promise.all([
-                    fetch(priceUrl),
-                    fetch(divUrl)
-                ]);
-                
-                const priceData = await priceRes.json();
-                const divData = await divRes.json();
-                
-                if (!priceData.chart || !priceData.chart.result || priceData.chart.result.length === 0) {
-                    throw new Error('No price data found');
-                }
-                
-                const quotes = priceData.chart.result[0].indicators.quote[0];
-                const timestamps = priceData.chart.result[0].timestamp;
-                
-                // Calculate weekly NAV changes
-                const weeklyPrices = [];
-                for (let i = 0; i < timestamps.length; i += 7) {
-                    if (quotes.close[i]) {
-                        weeklyPrices.push(quotes.close[i]);
+
+        function update() {
+            const weeks = parseInt(document.getElementById('weeks').value) || 52;
+
+            // ETF1
+            const nav1 = parseFloat(document.getElementById('nav1').value) || 10;
+            const dnav1 = parseFloat(document.getElementById('dnav1').value) / 100 || 0.005;
+            const dec1 = document.getElementById('dec1').checked;
+            let initial_y1 = dec1 ? 0 : (parseFloat(document.getElementById('yield1').value) / 100 || 0.01);
+            let initial_d1 = dec1 ? (parseFloat(document.getElementById('dist1').value) || 0.1) : 0;
+            const dy1 = parseFloat(document.getElementById('dy1').value) / 100 || 0;
+            document.getElementById('distdiv1').style.display = dec1 ? 'block' : 'none';
+            document.getElementById('yielddiv1').style.display = dec1 ? 'none' : 'block';
+
+            // ETF2
+            const nav2 = parseFloat(document.getElementById('nav2').value) || 10;
+            const dnav2 = parseFloat(document.getElementById('dnav2').value) / 100 || 0.002;
+            const dec2 = document.getElementById('dec2').checked;
+            let initial_y2 = dec2 ? 0 : (parseFloat(document.getElementById('yield2').value) / 100 || 0.005);
+            let initial_d2 = dec2 ? (parseFloat(document.getElementById('dist2').value) || 0.05) : 0;
+            const dy2 = parseFloat(document.getElementById('dy2').value) / 100 || 0;
+            document.getElementById('distdiv2').style.display = dec2 ? 'block' : 'none';
+            document.getElementById('yielddiv2').style.display = dec2 ? 'none' : 'block';
+
+            const res1 = compute(nav1, dnav1, initial_y1, dy1, weeks, dec1, initial_d1);
+            const res2 = compute(nav2, dnav2, initial_y2, dy2, weeks, dec2, initial_d2);
+
+            const x = Array.from({ length: weeks + 1 }, (_, i) => i);
+
+            if (chart) chart.destroy();
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: x,
+                    datasets: [
+                        {
+                            label: 'Cum Dist ETF1',
+                            data: res1.cum_dists,
+                            fill: true,
+                            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                            borderColor: 'rgb(255, 99, 132)',
+                            tension: 0.1
+                        },
+                        {
+                            label: 'NAV ETF1',
+                            data: res1.navs,
+                            borderColor: 'rgb(255, 99, 132)',
+                            borderDash: [5, 5],
+                            borderWidth: 1,
+                            pointRadius: 0,
+                            tension: 0.1
+                        },
+                        {
+                            label: 'DRIP Total ETF1',
+                            data: res1.drip_totals,
+                            borderColor: 'rgb(255, 99, 132)',
+                            backgroundColor: 'transparent',
+                            pointRadius: 0,
+                            tension: 0.1
+                        },
+                        {
+                            label: 'Cum Dist ETF2',
+                            data: res2.cum_dists,
+                            fill: true,
+                            backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                            borderColor: 'rgb(54, 162, 235)',
+                            tension: 0.1
+                        },
+                        {
+                            label: 'NAV ETF2',
+                            data: res2.navs,
+                            borderColor: 'rgb(54, 162, 235)',
+                            borderDash: [5, 5],
+                            borderWidth: 1,
+                            pointRadius: 0,
+                            tension: 0.1
+                        },
+                        {
+                            label: 'DRIP Total ETF2',
+                            data: res2.drip_totals,
+                            borderColor: 'rgb(54, 162, 235)',
+                            backgroundColor: 'transparent',
+                            pointRadius: 0,
+                            tension: 0.1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: { beginAtZero: true }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true
+                        }
                     }
                 }
-                
-                if (weeklyPrices.length < 2) {
-                    throw new Error('Not enough data points');
-                }
-                
-                // Calculate NAV decay rate
-                const navChanges = [];
-                for (let i = 1; i < weeklyPrices.length; i++) {
-                    const change = (weeklyPrices[i-1] - weeklyPrices[i]) / weeklyPrices[i-1];
-                    navChanges.push(change);
-                }
-                const avgNavDecay = navChanges.reduce((a, b) => a + b, 0) / navChanges.length;
-                
-                // Calculate distribution rate
-                let avgDistRate = 0;
-                if (divData.chart && divData.chart.result && divData.chart.result[0].events && divData.chart.result[0].events.dividends) {
-                    const dividends = Object.values(divData.chart.result[0].events.dividends);
-                    const totalDividends = dividends.reduce((sum, div) => sum + div.amount, 0);
-                    const avgPrice = weeklyPrices.reduce((a, b) => a + b, 0) / weeklyPrices.length;
-                    const weeks = weeklyPrices.length - 1;
-                    avgDistRate = (totalDividends / weeks) / avgPrice;
-                }
-                
-                // Fill ETF1 fields (you can change to ETF2 if needed)
-                document.getElementById('etf1-nav').value = weeklyPrices[0].toFixed(2);
-                document.getElementById('etf1-nav-decay').value = (avgNavDecay * 100).toFixed(2);
-                document.getElementById('etf1-dist-rate').value = (avgDistRate * 100).toFixed(2);
-                
-                document.getElementById('url-status').textContent = `Analysis complete for ${ticker}`;
-                setTimeout(() => {
-                    document.getElementById('url-status').textContent = '';
-                }, 3000);
-                
-                calculate();
-                
-            } catch (error) {
-                errorDiv.textContent = 'Error: ' + error.message + '. Please verify ticker and try manual entry.';
-                console.error(error);
-            }
-        }
-        
-        // Set default dates (last 6 months)
-        const today = new Date();
-        const sixMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 6, today.getDate());
-        document.getElementById('start-date').value = sixMonthsAgo.toISOString().split('T')[0];
-        document.getElementById('end-date').value = today.toISOString().split('T')[0];
-        
-        // URL handling
-        function updateURL() {
-            const params = new URLSearchParams();
-            
-            // Collect all parameters
-            params.set('weeks', document.getElementById('timeframe').value);
-            params.set('etf1-nav', document.getElementById('etf1-nav').value);
-            params.set('etf1-nav-decay', document.getElementById('etf1-nav-decay').value);
-            params.set('etf1-dist-rate', document.getElementById('etf1-dist-rate').value);
-            params.set('etf1-dist-decay', document.getElementById('etf1-dist-decay').value);
-            params.set('etf1-decouple', document.getElementById('etf1-decouple').checked);
-            params.set('etf1-abs-dist', document.getElementById('etf1-abs-dist').value);
-            
-            params.set('etf2-nav', document.getElementById('etf2-nav').value);
-            params.set('etf2-nav-decay', document.getElementById('etf2-nav-decay').value);
-            params.set('etf2-dist-rate', document.getElementById('etf2-dist-rate').value);
-            params.set('etf2-dist-decay', document.getElementById('etf2-dist-decay').value);
-            params.set('etf2-decouple', document.getElementById('etf2-decouple').checked);
-            params.set('etf2-abs-dist', document.getElementById('etf2-abs-dist').value);
-            
-            const newUrl = window.location.pathname + '?' + params.toString();
-            window.history.replaceState({}, '', newUrl);
-        }
-        
-        function loadFromURL() {
-            const params = new URLSearchParams(window.location.search);
-            
-            if (params.toString() === '') return;
-            
-            // Load parameters
-            if (params.has('weeks')) document.getElementById('timeframe').value = params.get('weeks');
-            if (params.has('etf1-nav')) document.getElementById('etf1-nav').value = params.get('etf1-nav');
-            if (params.has('etf1-nav-decay')) document.getElementById('etf1-nav-decay').value = params.get('etf1-nav-decay');
-            if (params.has('etf1-dist-rate')) document.getElementById('etf1-dist-rate').value = params.get('etf1-dist-rate');
-            if (params.has('etf1-dist-decay')) document.getElementById('etf1-dist-decay').value = params.get('etf1-dist-decay');
-            if (params.has('etf1-decouple')) document.getElementById('etf1-decouple').checked = params.get('etf1-decouple') === 'true';
-            if (params.has('etf1-abs-dist')) document.getElementById('etf1-abs-dist').value = params.get('etf1-abs-dist');
-            
-            if (params.has('etf2-nav')) document.getElementById('etf2-nav').value = params.get('etf2-nav');
-            if (params.has('etf2-nav-decay')) document.getElementById('etf2-nav-decay').value = params.get('etf2-nav-decay');
-            if (params.has('etf2-dist-rate')) document.getElementById('etf2-dist-rate').value = params.get('etf2-dist-rate');
-            if (params.has('etf2-dist-decay')) document.getElementById('etf2-dist-decay').value = params.get('etf2-dist-decay');
-            if (params.has('etf2-decouple')) document.getElementById('etf2-decouple').checked = params.get('etf2-decouple') === 'true';
-            if (params.has('etf2-abs-dist')) document.getElementById('etf2-abs-dist').value = params.get('etf2-abs-dist');
-            
-            // Trigger decouple change events
-            document.getElementById('etf1-decouple').dispatchEvent(new Event('change'));
-            document.getElementById('etf2-decouple').dispatchEvent(new Event('change'));
-        }
-        
-        function shareSimulation() {
-            const url = window.location.href;
-            navigator.clipboard.writeText(url).then(() => {
-                document.getElementById('url-status').textContent = 'URL copied to clipboard!';
-                setTimeout(() => {
-                    document.getElementById('url-status').textContent = '';
-                }, 3000);
-            }).catch(() => {
-                document.getElementById('url-status').textContent = 'Failed to copy. Please copy manually.';
             });
+
+            document.getElementById('summary').innerHTML = `
+                <h3>Summary at ${weeks} Weeks (Initial Investment: $${nav1.toFixed(2)} each)</h3>
+                <p><strong>ETF1:</strong> Total Distributions: $${res1.final_cum_dist.toFixed(2)} | No DRIP Total Return: $${res1.final_no_drip.toFixed(2)} | Full DRIP Total Return: $${res1.final_drip.toFixed(2)}</p>
+                <p><strong>ETF2:</strong> Total Distributions: $${res2.final_cum_dist.toFixed(2)} | No DRIP Total Return: $${res2.final_no_drip.toFixed(2)} | Full DRIP Total Return: $${res2.final_drip.toFixed(2)}</p>
+            `;
+
+            // Save to URL
+            const params = new URLSearchParams({
+                w: document.getElementById('weeks').value,
+                nav1: document.getElementById('nav1').value,
+                dnav1: document.getElementById('dnav1').value,
+                dec1: dec1 ? '1' : '0',
+                yield1: document.getElementById('yield1').value,
+                dist1: document.getElementById('dist1').value,
+                dy1: document.getElementById('dy1').value,
+                nav2: document.getElementById('nav2').value,
+                dnav2: document.getElementById('dnav2').value,
+                dec2: dec2 ? '1' : '0',
+                yield2: document.getElementById('yield2').value,
+                dist2: document.getElementById('dist2').value,
+                dy2: document.getElementById('dy2').value
+            });
+            history.replaceState(null, '', '?' + params.toString());
         }
-        
-        // Initial load
-        loadFromURL();
-        calculate();
+
+        // Event listeners
+        document.querySelectorAll('input, #dec1, #dec2').forEach(el => {
+            el.addEventListener('input', update);
+            el.addEventListener('change', update);
+        });
+
+        // Load from URL
+        window.addEventListener('load', () => {
+            const params = new URLSearchParams(window.location.search);
+            const fields = ['weeks', 'nav1', 'dnav1', 'yield1', 'dist1', 'dy1', 'nav2', 'dnav2', 'yield2', 'dist2', 'dy2'];
+            fields.forEach(f => {
+                if (params.has(f)) document.getElementById(f).value = params.get(f);
+            });
+            if (params.get('dec1') === '1') document.getElementById('dec1').checked = true;
+            if (params.get('dec2') === '1') document.getElementById('dec2').checked = true;
+            update();
+        });
+
+        // Analyze
+        async function analyze() {
+            const ticker = document.getElementById('ticker').value.toUpperCase().trim();
+            const start = document.getElementById('startdate').value;
+            const end = document.getElementById('enddate').value;
+            if (!ticker || !start || !end) return alert('Please fill ticker and dates.');
+            const startUnix = Math.floor(new Date(start).getTime() / 1000);
+            const endUnix = Math.floor(new Date(end).getTime() / 1000);
+            const proxy = 'https://api.allorigins.win/raw?url=';
+            try {
+                // Price history
+                let priceUrl = encodeURIComponent(`https://query1.finance.yahoo.com/v7/finance/download/${ticker}?period1=${startUnix}&period2=${endUnix}&interval=1wk&events=history&includeAdjustedClose=true`);
+                const priceResp = await fetch(proxy + priceUrl);
+                if (!priceResp.ok) throw new Error('Price fetch failed');
+                const priceText = await priceResp.text();
+                const priceLines = priceText.split('\n').filter(l => l.trim()).slice(1);
+                let navs = [];
+                priceLines.forEach(line => {
+                    const parts = line.split(',');
+                    const adj = parseFloat(parts[6]);
+                    if (!isNaN(adj) && adj > 0) navs.push(adj);
+                });
+                if (navs.length < 2) throw new Error('Insufficient price data');
+
+                let log_returns = [];
+                for (let i = 1; i < navs.length; i++) {
+                    log_returns.push(Math.log(navs[i] / navs[i - 1]));
+                }
+                const avg_log_r = log_returns.reduce((a, b) => a + b, 0) / log_returns.length;
+                const d_nav_pct = (-avg_log_r * 100).toFixed(4);
+                const initial_nav_val = navs[0].toFixed(2);
+
+                // Dividends
+                let divUrl = encodeURIComponent(`https://query1.finance.yahoo.com/v7/finance/download/${ticker}?period1=${startUnix}&period2=${endUnix}&interval=1d&events=div&includeAdjustedClose=true`);
+                const divResp = await fetch(proxy + divUrl);
+                if (!divResp.ok) throw new Error('Div fetch failed');
+                const divText = await divResp.text();
+                const divLines = divText.split('\n').filter(l => l.trim()).slice(1);
+                let total_div = 0;
+                divLines.forEach(line => {
+                    const parts = line.split(',');
+                    const close = parseFloat(parts[4]); // Dividend amount in Close
+                    if (!isNaN(close) && close > 0) total_div += close;
+                });
+
+                const num_weeks = navs.length - 1;
+                const avg_weekly_dist = total_div / num_weeks;
+                const avg_nav = navs.reduce((a, b) => a + b, 0) / navs.length;
+                const avg_yield_pct = (avg_weekly_dist / avg_nav * 100).toFixed(4);
+
+                // Fill ETF1 (coupled)
+                document.getElementById('nav1').value = initial_nav_val;
+                document.getElementById('dnav1').value = d_nav_pct;
+                document.getElementById('dec1').checked = false;
+                document.getElementById('yield1').value = avg_yield_pct;
+                document.getElementById('dy1').value = '0';
+                document.getElementById('distdiv1').style.display = 'none';
+                document.getElementById('yielddiv1').style.display = 'block';
+                update();
+                alert(`ETF1 filled: NAV $${initial_nav_val}, Decay ${d_nav_pct}%, Yield ${avg_yield_pct}%/week, Dist Decay 0%`);
+            } catch (e) {
+                alert('Error fetching data: ' + e.message + '. Check ticker/dates or network.');
+            }
+        }
     </script>
 </body>
 </html>
