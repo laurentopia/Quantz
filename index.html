@@ -654,11 +654,9 @@
             calculate();
         }
         
-        // Set ticker and load mock data
+        // Set ticker only - DO NOT CHANGE DATES
         function setTickerAndLoad(ticker) {
             document.getElementById('ticker').value = ticker;
-            document.getElementById('start-date').value = new Date(Date.now() - 365*24*60*60*1000).toISOString().split('T')[0];
-            document.getElementById('end-date').value = new Date().toISOString().split('T')[0];
         }
         
         // Yahoo Finance analysis with smart proxy rotation
