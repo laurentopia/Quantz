@@ -35,16 +35,6 @@
             font-size: 28px;
         }
         
-        .timeframe {
-            margin-bottom: 20px;
-            text-align: center;
-        }
-        
-        .timeframe input {
-            width: 200px;
-            margin: 0 auto;
-        }
-        
         .ticker-tool {
             margin-bottom: 30px;
             padding: 20px;
@@ -84,6 +74,33 @@
             background: #ccc;
             cursor: not-allowed;
             opacity: 0.6;
+        }
+        
+        .quick-tickers {
+            margin-top: 10px;
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+        
+        .quick-tickers button {
+            padding: 5px 10px;
+            font-size: 12px;
+            background: #6c757d;
+        }
+        
+        .quick-tickers button:hover:not(:disabled) {
+            background: #5a6268;
+        }
+        
+        .timeframe {
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        .timeframe input {
+            width: 200px;
+            margin: 0 auto;
         }
         
         .controls {
@@ -262,50 +279,24 @@
             color: #666;
             margin-top: 5px;
         }
-        
-        .quick-tickers {
-            margin-top: 10px;
-            display: flex;
-            gap: 5px;
-            flex-wrap: wrap;
-        }
-        
-        .quick-tickers button {
-            padding: 5px 10px;
-            font-size: 12px;
-            background: #6c757d;
-        }
-        
-        .quick-tickers button:hover {
-            background: #5a6268;
-        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>ETF Distribution & NAV Comparator</h1>
         
-        <div class="timeframe">
-            <div class="input-group">
-                <label for="timeframe">Time Frame (Weeks)</label>
-                <input type="number" id="timeframe" value="52" min="1" max="520">
-            </div>
-        </div>
-        
         <div class="ticker-tool">
-            <h3>Automatic Ticker Analysis (Yahoo Finance)</h3>
+            <h3>Automatic Ticker Analysis</h3>
             <div id="ticker-error" class="error"></div>
-            <div id="ticker-info" class="info">
-                Fetches real data from Yahoo Finance using multiple proxy endpoints. Distribution history is extracted from dividend events.
-            </div>
+            <div id="ticker-info" class="info" style="display: none;"></div>
             <div id="ticker-success" class="success" style="display: none;"></div>
             <div id="ticker-loading" class="loading" style="display: none;">
-                Attempting to fetch data...
+                Fetching data...
             </div>
             <div class="ticker-inputs">
                 <div class="input-group">
                     <label for="ticker">Ticker Symbol</label>
-                    <input type="text" id="ticker" placeholder="e.g., JEPY, QQQY, JEPI, SPY">
+                    <input type="text" id="ticker" placeholder="e.g., JEPY, QQQY, JEPI">
                 </div>
                 <div class="input-group">
                     <label for="start-date">Start Date</label>
@@ -318,19 +309,27 @@
                 <button onclick="analyzeTicker()" id="analyze-btn">Analyze Ticker</button>
             </div>
             <div class="quick-tickers">
-                <button onclick="setTickerAndLoad('JEPY')">JEPY</button>
-                <button onclick="setTickerAndLoad('QQQY')">QQQY</button>
-                <button onclick="setTickerAndLoad('JEPI')">JEPI</button>
-                <button onclick="setTickerAndLoad('SPY')">SPY</button>
-                <button onclick="setTickerAndLoad('QQQ')">QQQ</button>
-                <button onclick="setTickerAndLoad('MAIN')">MAIN</button>
+                <button onclick="setTicker('ULTY')">ULTY</button>
+                <button onclick="setTicker('BLOX')">BLOX</button>
+                <button onclick="setTicker('KYLD')">KYLD</button>
+                <button onclick="setTicker('ULTI')">ULTI</button>
+                <button onclick="setTicker('JEPY')">JEPY</button>
+                <button onclick="setTicker('QQQY')">QQQY</button>
+                <button onclick="setTicker('JEPI')">JEPI</button>
+                <button onclick="setTicker('SPY')">SPY</button>
             </div>
             <div class="apply-buttons">
                 <button onclick="applyToETF(1)" disabled id="apply-etf1-btn">→ Apply to ETF 1</button>
                 <button onclick="applyToETF(2)" disabled id="apply-etf2-btn">→ Apply to ETF 2</button>
             </div>
-            <button onclick="loadMockData()" style="background: #ffc107; color: #333; margin-top: 10px;">Load Mock Data (Demo)</button>
             <div class="proxy-status" id="proxy-status"></div>
+        </div>
+        
+        <div class="timeframe">
+            <div class="input-group">
+                <label for="timeframe">Time Frame (Weeks)</label>
+                <input type="number" id="timeframe" value="52" min="1" max="520">
+            </div>
         </div>
         
         <div class="controls">
@@ -455,7 +454,7 @@
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                animation: false, // Disable all animations
+                animation: false,
                 interaction: {
                     mode: 'index',
                     intersect: false,
@@ -520,142 +519,16 @@
                 name: 'CORS Proxy',
                 url: (target) => `https://corsproxy.io/?${encodeURIComponent(target)}`,
                 method: 'fetch'
-            },
-            {
-                name: 'JSONP Fetch',
-                url: (target) => `${target}&callback=?`,
-                method: 'jsonp'
             }
         ];
         
         let currentProxyIndex = 0;
-        let analysisResults = null; // Store analysis results
-        
-        // Utility functions
-        function debounce(func, wait) {
-            let timeout;
-            return function executedFunction(...args) {
-                const later = () => {
-                    clearTimeout(timeout);
-                    func(...args);
-                };
-                clearTimeout(timeout);
-                timeout = setTimeout(later, wait);
-            };
-        }
-        
-        // JSONP fetch function
-        function jsonpFetch(url) {
-            return new Promise((resolve, reject) => {
-                const callbackName = 'jsonp_callback_' + Math.round(100000 * Math.random());
-                const script = document.createElement('script');
-                
-                window[callbackName] = function(data) {
-                    delete window[callbackName];
-                    document.body.removeChild(script);
-                    resolve({ ok: true, json: () => Promise.resolve(data) });
-                };
-                
-                script.src = url.replace('callback=?', `callback=${callbackName}`);
-                script.onerror = () => {
-                    delete window[callbackName];
-                    document.body.removeChild(script);
-                    reject(new Error('JSONP failed'));
-                };
-                
-                document.body.appendChild(script);
-            });
-        }
-        
-        // Smart fetch with proxy rotation
-        async function smartFetch(url) {
-            const endpoint = PROXY_ENDPOINTS[currentProxyIndex];
-            console.log(`Trying ${endpoint.name}...`);
-            
-            document.getElementById('proxy-status').textContent = `Using proxy: ${endpoint.name}`;
-            
-            try {
-                if (endpoint.method === 'jsonp') {
-                    return await jsonpFetch(url);
-                } else {
-                    const proxiedUrl = endpoint.url(url);
-                    const response = await fetch(proxiedUrl);
-                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                    return response;
-                }
-            } catch (error) {
-                // Try next proxy
-                currentProxyIndex = (currentProxyIndex + 1) % PROXY_ENDPOINTS.length;
-                if (currentProxyIndex === 0) {
-                    throw new Error('All proxies failed');
-                }
-                return smartFetch(url); // Retry with next proxy
-            }
-        }
-        
-        // Mock data generator
-        function generateMockData(ticker, weeks = 52) {
-            console.log('Generating mock data for demonstration...');
-            
-            const mockProfiles = {
-                'JEPY': {
-                    name: 'JPMorgan Nasdaq Equity Premium Income ETF',
-                    initialNav: 52.00,
-                    navDecay: 0.1,
-                    distRate: 0.4,
-                    distDecay: 0.05
-                },
-                'QQQY': {
-                    name: 'Defiance Nasdaq 100 Enhanced Options Income ETF',
-                    initialNav: 15.50,
-                    navDecay: 0.15,
-                    distRate: 0.7,
-                    distDecay: 0.1
-                },
-                'SPY': {
-                    name: 'SPDR S&P 500 ETF',
-                    initialNav: 445.00,
-                    navDecay: 0.02,
-                    distRate: 0.06,
-                    distDecay: 0.0
-                },
-                'QQQ': {
-                    name: 'Invesco QQQ Trust',
-                    initialNav: 365.00,
-                    navDecay: 0.03,
-                    distRate: 0.05,
-                    distDecay: 0.0
-                },
-                'JEPI': {
-                    name: 'JPMorgan Equity Premium Income ETF',
-                    initialNav: 56.00,
-                    navDecay: 0.08,
-                    distRate: 0.35,
-                    distDecay: 0.03
-                },
-                'MAIN': {
-                    name: 'Main Street Capital Corporation',
-                    initialNav: 45.00,
-                    navDecay: 0.02,
-                    distRate: 0.25,
-                    distDecay: 0.0
-                }
-            };
-            
-            return mockProfiles[ticker.toUpperCase()] || {
-                name: `${ticker} (Default Profile)`,
-                initialNav: 100.00,
-                navDecay: 0.1,
-                distRate: 0.3,
-                distDecay: 0.05
-            };
-        }
+        let analysisResults = null;
         
         // Main calculation function
         function calculate() {
             const weeks = parseInt(document.getElementById('timeframe').value) || 52;
             
-            // Get ETF1 values
             const etf1 = {
                 initialNav: parseFloat(document.getElementById('etf1-nav').value) || 100,
                 navDecay: parseFloat(document.getElementById('etf1-nav-decay').value) / 100 || 0,
@@ -665,7 +538,6 @@
                 absDist: parseFloat(document.getElementById('etf1-abs-dist').value) || 0
             };
             
-            // Get ETF2 values
             const etf2 = {
                 initialNav: parseFloat(document.getElementById('etf2-nav').value) || 100,
                 navDecay: parseFloat(document.getElementById('etf2-nav-decay').value) / 100 || 0,
@@ -675,7 +547,6 @@
                 absDist: parseFloat(document.getElementById('etf2-abs-dist').value) || 0
             };
             
-            // Generate data
             const labels = [];
             const etf1Nav = [];
             const etf1CumDist = [];
@@ -684,13 +555,11 @@
             const etf2CumDist = [];
             const etf2Drip = [];
             
-            // ETF1 calculations
             let nav1 = etf1.initialNav;
             let cumDist1 = 0;
             let shares1 = 1;
             let dripValue1 = etf1.initialNav;
             
-            // ETF2 calculations
             let nav2 = etf2.initialNav;
             let cumDist2 = 0;
             let shares2 = 1;
@@ -699,11 +568,9 @@
             for (let w = 0; w <= weeks; w++) {
                 labels.push(w);
                 
-                // Store current NAV
                 etf1Nav.push(nav1);
                 etf2Nav.push(nav2);
                 
-                // Calculate distributions for this week
                 let dist1;
                 if (etf1.decoupled) {
                     const currentAbsDist = etf1.absDist * Math.pow(1 - etf1.distDecay, w);
@@ -722,13 +589,11 @@
                     dist2 = nav2 * currentDistRate;
                 }
                 
-                // Update cumulative distributions
                 cumDist1 += dist1;
                 cumDist2 += dist2;
                 etf1CumDist.push(cumDist1);
                 etf2CumDist.push(cumDist2);
                 
-                // DRIP calculations
                 shares1 += dist1 / nav1;
                 shares2 += dist2 / nav2;
                 
@@ -738,12 +603,10 @@
                 etf1Drip.push(dripValue1);
                 etf2Drip.push(dripValue2);
                 
-                // Update NAV for next week
                 nav1 *= (1 - etf1.navDecay);
                 nav2 *= (1 - etf2.navDecay);
             }
             
-            // Update summary
             document.getElementById('etf1-total-dist').textContent = '$' + cumDist1.toFixed(2);
             document.getElementById('etf1-final-nav').textContent = '$' + etf1Nav[etf1Nav.length - 1].toFixed(2);
             document.getElementById('etf1-total-return').textContent = '$' + (etf1Nav[etf1Nav.length - 1] + cumDist1).toFixed(2);
@@ -754,7 +617,6 @@
             document.getElementById('etf2-total-return').textContent = '$' + (etf2Nav[etf2Nav.length - 1] + cumDist2).toFixed(2);
             document.getElementById('etf2-drip-value').textContent = '$' + dripValue2.toFixed(2);
             
-            // Update chart
             chart.data.labels = labels;
             chart.data.datasets = [
                 {
@@ -821,7 +683,7 @@
                 }
             ];
             
-            chart.update('none'); // Update without animation
+            chart.update('none');
             updateURL();
         }
         
@@ -843,7 +705,6 @@
                 document.getElementById('etf2-dist-decay').value = (results.distDecay * 100).toFixed(2);
             }
             
-            // Disable apply buttons after applying
             document.getElementById('apply-etf1-btn').disabled = true;
             document.getElementById('apply-etf2-btn').disabled = true;
             analysisResults = null;
@@ -851,13 +712,12 @@
             calculate();
         }
         
-        // Set ticker and load mock data
-        function setTickerAndLoad(ticker) {
+        // Set ticker input
+        function setTicker(ticker) {
             document.getElementById('ticker').value = ticker;
-            loadMockData();
         }
         
-        // Yahoo Finance analysis with smart proxy rotation
+        // Yahoo Finance analysis with detailed progress
         async function analyzeTicker() {
             const ticker = document.getElementById('ticker').value.toUpperCase();
             const startDate = document.getElementById('start-date').value;
@@ -871,6 +731,7 @@
             const applyBtn2 = document.getElementById('apply-etf2-btn');
             
             errorDiv.textContent = '';
+            infoDiv.textContent = '';
             successDiv.textContent = '';
             loadingDiv.style.display = 'block';
             analyzeBtn.disabled = true;
@@ -891,12 +752,11 @@
                 const priceUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?period1=${period1}&period2=${period2}&interval=1d`;
                 const divUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?period1=${period1}&period2=${period2}&interval=1d&events=div`;
                 
-                loadingDiv.textContent = `Attempting to fetch ${ticker} data...`;
+                loadingDiv.textContent = `Fetching price data for ${ticker}...`;
                 
-                const [priceRes, divRes] = await Promise.all([
-                    smartFetch(priceUrl),
-                    smartFetch(divUrl)
-                ]);
+                const priceRes = await smartFetch(priceUrl);
+                loadingDiv.textContent = `Fetching distribution data for ${ticker}...`;
+                const divRes = await smartFetch(divUrl);
                 
                 loadingDiv.style.display = 'none';
                 analyzeBtn.disabled = false;
@@ -905,7 +765,7 @@
                 const divData = await divRes.json();
                 
                 if (!priceData.chart || !priceData.chart.result || priceData.chart.result.length === 0) {
-                    throw new Error(`No price data found for ticker: ${ticker}. Verify the symbol exists on Yahoo Finance.`);
+                    throw new Error(`No price data found for ticker: ${ticker}`);
                 }
                 
                 const result = priceData.chart.result[0];
@@ -913,9 +773,20 @@
                 const timestamps = result.timestamp;
                 const quotes = indicators.quote[0];
                 
+                if (!timestamps || timestamps.length === 0) {
+                    throw new Error('No data available for the selected date range');
+                }
+                
+                const actualStartDate = new Date(timestamps[0] * 1000).toISOString().split('T')[0];
+                const actualEndDate = new Date(timestamps[timestamps.length - 1] * 1000).toISOString().split('T')[0];
+                const dataPoints = timestamps.length;
+                const weeklyDataPoints = Math.floor(dataPoints / 7);
+                
+                infoDiv.textContent = `Data range: ${actualStartDate} to ${actualEndDate} | ${dataPoints} daily points → ~${weeklyDataPoints} weeks`;
+                infoDiv.style.display = 'block';
+                
                 // Extract weekly price data
                 const weeklyPrices = [];
-                
                 for (let i = 0; i < timestamps.length; i += 7) {
                     if (quotes.close && quotes.close[i]) {
                         weeklyPrices.push(quotes.close[i]);
@@ -923,21 +794,20 @@
                 }
                 
                 if (weeklyPrices.length < 2) {
-                    throw new Error(`Not enough weekly data points. Found ${weeklyPrices.length} weeks. Try a longer date range (at least 3 months).`);
+                    throw new Error(`Not enough weekly data. Found ${weeklyPrices.length} weeks. Need at least 2.`);
                 }
                 
-                // Calculate NAV decay rate
-                const navChanges = [];
-                for (let i = 1; i < weeklyPrices.length; i++) {
-                    const change = (weeklyPrices[i-1] - weeklyPrices[i]) / weeklyPrices[i-1];
-                    navChanges.push(change);
-                }
-                const avgNavDecay = navChanges.reduce((a, b) => a + b, 0) / navChanges.length;
+                // Calculate NAV decay rate using exponential decay formula
+                const weeks = weeklyPrices.length - 1;
+                const firstPrice = weeklyPrices[0];
+                const lastPrice = weeklyPrices[weeklyPrices.length - 1];
+                const totalDecay = (firstPrice - lastPrice) / firstPrice;
+                const avgNavDecay = 1 - Math.pow(Math.max(0.0001, 1 - totalDecay), 1/weeks);
                 
                 // Extract distribution data
                 let totalDividends = 0;
                 let dividendCount = 0;
-                let avgDistRate = 0.0025;
+                let avgDistRate = 0;
                 let distDecay = 0.05;
                 
                 if (divData.chart && divData.chart.result && divData.chart.result[0].events && divData.chart.result[0].events.dividends) {
@@ -945,25 +815,28 @@
                     totalDividends = dividends.reduce((sum, div) => sum + div.amount, 0);
                     dividendCount = dividends.length;
                     
+                    // Calculate distribution rate based on average price
                     const avgPrice = weeklyPrices.reduce((a, b) => a + b, 0) / weeklyPrices.length;
-                    const weeks = weeklyPrices.length - 1;
                     avgDistRate = (totalDividends / weeks) / avgPrice;
                     
+                    // Calculate distribution decay using exponential decay
                     if (dividends.length >= 2) {
                         const firstHalf = dividends.slice(0, Math.ceil(dividends.length / 2));
                         const secondHalf = dividends.slice(Math.floor(dividends.length / 2));
                         const avgFirst = firstHalf.reduce((sum, div) => sum + div.amount, 0) / firstHalf.length;
                         const avgSecond = secondHalf.reduce((sum, div) => sum + div.amount, 0) / secondHalf.length;
-                        if (avgFirst > 0) {
-                            distDecay = Math.max(0, (avgFirst - avgSecond) / avgFirst / (weeks / 2));
+                        if (avgFirst > 0 && avgSecond > 0) {
+                            const weeksBetween = Math.floor(weeks / 2);
+                            distDecay = 1 - Math.pow(Math.max(0.0001, avgSecond / avgFirst), 1/weeksBetween);
                         }
                     }
                     
-                    successDiv.textContent = `Found ${dividendCount} distributions totaling $${totalDividends.toFixed(3)} over ${weeks} weeks. Average weekly yield: ${(avgDistRate * 100).toFixed(3)}%`;
+                    successDiv.textContent = `Found ${dividendCount} distributions totaling $${totalDividends.toFixed(4)} | Avg weekly yield: ${(avgDistRate * 100).toFixed(3)}% | NAV decay: ${(avgNavDecay * 100).toFixed(2)}%`;
                     successDiv.style.display = 'block';
                 } else {
-                    infoDiv.textContent = 'No distribution history found. Estimating yield from adjusted close prices...';
+                    infoDiv.textContent += ' | No distribution history found. Using price-based estimate.';
                     
+                    // Estimate yield from adjusted close
                     if (indicators.adjclose && indicators.adjclose[0].adjclose) {
                         const adjClose = indicators.adjclose[0].adjclose;
                         const weeklyAdjPrices = [];
@@ -974,13 +847,13 @@
                         if (weeklyAdjPrices.length >= 2) {
                             const totalReturn = (weeklyAdjPrices[weeklyAdjPrices.length - 1] - weeklyPrices[0]) / weeklyPrices[0];
                             const priceReturn = (weeklyPrices[weeklyPrices.length - 1] - weeklyPrices[0]) / weeklyPrices[0];
-                            const impliedYield = totalReturn - priceReturn;
-                            avgDistRate = Math.max(0, impliedYield / weeklyPrices.length);
+                            const impliedYield = Math.max(0, totalReturn - priceReturn);
+                            avgDistRate = impliedYield / weeks;
                         }
                     }
                 }
                 
-                // Store results instead of applying them
+                // Store results
                 analysisResults = {
                     initialNav: weeklyPrices[0],
                     navDecay: avgNavDecay,
@@ -992,54 +865,13 @@
                 applyBtn1.disabled = false;
                 applyBtn2.disabled = false;
                 
-                infoDiv.textContent = `Analysis complete: ${ticker} data loaded from Yahoo Finance. Select where to apply the data.`;
-                
-                setTimeout(() => {
-                    successDiv.style.display = 'none';
-                }, 5000);
-                
             } catch (error) {
                 loadingDiv.style.display = 'none';
                 analyzeBtn.disabled = false;
-                errorDiv.textContent = 'Error: ' + error.message;
-                
-                if (currentProxyIndex < PROXY_ENDPOINTS.length - 1) {
-                    infoDiv.textContent = `Proxy failed. Click "Retry with Backup Proxy" to try ${PROXY_ENDPOINTS[currentProxyIndex + 1].name}.`;
-                } else {
-                    infoDiv.textContent = 'All proxies failed. Use "Load Mock Data" or try again later.';
-                }
-                
+                errorDiv.textContent = error.message;
+                infoDiv.style.display = 'none';
                 console.error(error);
             }
-        }
-        
-        // Load mock data
-        function loadMockData() {
-            const ticker = document.getElementById('ticker').value || 'JEPY';
-            document.getElementById('ticker').value = ticker;
-            
-            const mockData = generateMockData(ticker);
-            
-            // Store mock results
-            analysisResults = {
-                initialNav: mockData.initialNav,
-                navDecay: mockData.navDecay,
-                distRate: mockData.distRate,
-                distDecay: mockData.distDecay
-            };
-            
-            // Enable apply buttons
-            document.getElementById('apply-etf1-btn').disabled = false;
-            document.getElementById('apply-etf2-btn').disabled = false;
-            
-            document.getElementById('ticker-success').textContent = `Loaded mock data for ${mockData.name}. Select where to apply.`;
-            document.getElementById('ticker-success').style.display = 'block';
-            
-            setTimeout(() => {
-                document.getElementById('ticker-success').style.display = 'none';
-            }, 3000);
-            
-            document.getElementById('ticker-info').textContent = 'Mock data ready. Click "Apply to ETF 1" or "Apply to ETF 2" to use.';
         }
         
         // Event listeners
@@ -1085,7 +917,7 @@
         });
         document.getElementById('etf2-abs-dist').addEventListener('input', debouncedCalculate);
         
-        // Set default dates
+        // Set default dates (last 6 months)
         const today = new Date();
         const sixMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 6, today.getDate());
         document.getElementById('start-date').value = sixMonthsAgo.toISOString().split('T')[0];
