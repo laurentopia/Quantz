@@ -1159,6 +1159,9 @@
             params.set('etf2-dist-decay', document.getElementById('etf2-dist-decay').value);
             params.set('etf2-decouple', document.getElementById('etf2-decouple').checked);
             params.set('etf2-abs-dist', document.getElementById('etf2-abs-dist').value);
+
+            params.set('etf1-name', etfNames.etf1);
+            params.set('etf2-name', etfNames.etf2);
             
             const newUrl = window.location.pathname + '?' + params.toString();
             window.history.replaceState({}, '', newUrl);
@@ -1182,9 +1185,24 @@
             if (params.has('etf2-dist-decay')) document.getElementById('etf2-dist-decay').value = params.get('etf2-dist-decay');
             if (params.has('etf2-decouple')) document.getElementById('etf2-decouple').checked = params.get('etf2-decouple') === 'true';
             if (params.has('etf2-abs-dist')) document.getElementById('etf2-abs-dist').value = params.get('etf2-abs-dist');
+
+              // Load ETF names
+            if (params.has('etf1-name')) {
+                etfNames.etf1 = params.get('etf1-name');
+                document.getElementById('etf1-title').textContent = etfNames.etf1;
+                document.getElementById('etf1-summary-title').textContent = `${etfNames.etf1} Total Distributions`;
+            }
+            if (params.has('etf2-name')) {
+                etfNames.etf2 = params.get('etf2-name');
+                document.getElementById('etf2-title').textContent = etfNames.etf2;
+                document.getElementById('etf2-summary-title').textContent = `${etfNames.etf2} Total Distributions`;
+            }
             
             document.getElementById('etf1-decouple').dispatchEvent(new Event('change'));
             document.getElementById('etf2-decouple').dispatchEvent(new Event('change'));
+
+            // Update comparison title
+            document.getElementById('comparison-title').textContent = `${etfNames.etf1} vs ${etfNames.etf2} Comparison`;
         }
         
         function shareSimulation() {
