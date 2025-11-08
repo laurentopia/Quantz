@@ -410,7 +410,7 @@
         
         <div class="controls">
             <div class="etf-panel" id="etf1-panel">
-                <h2>ETF 1</h2>
+                <h2 id="etf1-title">ETF 1</h2>
                 <div class="decouple-toggle">
                     <label>
                         <input type="checkbox" id="etf1-decouple">
@@ -436,7 +436,7 @@
             </div>
             
             <div class="etf-panel" id="etf2-panel">
-                <h2>ETF 2</h2>
+                <h2 id="etf2-title">ETF 2</h2>
                 <div class="decouple-toggle">
                     <label>
                         <input type="checkbox" id="etf2-decouple">
@@ -468,7 +468,7 @@
         
         <div class="summary">
             <div class="summary-box">
-                <h3>ETF 1 Total Distributions</h3>
+                <h3 id="etf1-summary-title">ETF 1 Total Distributions</h3>
                 <div class="summary-value" id="etf1-total-dist">$0.00</div>
                 <div class="summary-label">Reinvesting not included</div>
                 <div style="margin-top: 10px;">
@@ -486,7 +486,7 @@
             </div>
             
             <div class="summary-box">
-                <h3>ETF 2 Total Distributions</h3>
+                <h3 id="etf2-summary-title">ETF 2 Total Distributions</h3>
                 <div class="summary-value" id="etf2-total-dist">$0.00</div>
                 <div class="summary-label">Reinvesting not included</div>
                 <div style="margin-top: 10px;">
@@ -505,7 +505,7 @@
         </div>
         
         <div class="delta-comparison" id="delta-comparison">
-            <h3 style="text-align: center; margin-bottom: 15px;">ETF 1 vs ETF 2 Comparison</h3>
+            <h3 style="text-align: center; margin-bottom: 15px;" id="comparison-title">ETF 1 vs ETF 2 Comparison</h3>
             <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;">
                 <div style="text-align: center;">
                     <div class="summary-label">Total Distributions</div>
@@ -615,6 +615,8 @@
         
         let currentProxyIndex = 0;
         let analysisResults = null;
+        let etfNames = { etf1: 'ETF 1', etf2: 'ETF 2' };
+        let analyzedTicker = null;
         
         // Utility functions
         function debounce(func, wait) {
@@ -800,7 +802,7 @@
             chart.data.labels = labels;
             chart.data.datasets = [
                 {
-                    label: 'ETF 1 Value',
+                    label: `${etfNames.etf1} Value`,
                     data: etf1Value,
                     borderColor: colors.etf1.nav,
                     backgroundColor: 'transparent',
@@ -810,7 +812,7 @@
                     yAxisID: 'y',
                 },
                 {
-                    label: 'ETF 1 Distributions',
+                    label: `${etfNames.etf1} Distributions`,
                     data: etf1CumDist,
                     borderColor: colors.etf1.dist,
                     backgroundColor: colors.etf1.dist,
@@ -820,7 +822,7 @@
                     yAxisID: 'y',
                 },
                 {
-                    label: 'ETF 1 DRIP',
+                    label: `${etfNames.etf1} DRIP`,
                     data: etf1Drip,
                     borderColor: colors.etf1.drip,
                     backgroundColor: 'transparent',
@@ -830,7 +832,7 @@
                     yAxisID: 'y',
                 },
                 {
-                    label: 'ETF 2 Value',
+                    label: `${etfNames.etf2} Value`,
                     data: etf2Value,
                     borderColor: colors.etf2.nav,
                     backgroundColor: 'transparent',
@@ -840,7 +842,7 @@
                     yAxisID: 'y',
                 },
                 {
-                    label: 'ETF 2 Distributions',
+                    label: `${etfNames.etf2} Distributions`,
                     data: etf2CumDist,
                     borderColor: colors.etf2.dist,
                     backgroundColor: colors.etf2.dist,
@@ -850,7 +852,7 @@
                     yAxisID: 'y',
                 },
                 {
-                    label: 'ETF 2 DRIP',
+                    label: `${etfNames.etf2} DRIP`,
                     data: etf2Drip,
                     borderColor: colors.etf2.drip,
                     backgroundColor: 'transparent',
@@ -867,26 +869,27 @@
         
         // Apply analysis results to ETF
         function applyToETF(etfNumber) {
-            if (!analysisResults) return;
-            
-            const results = analysisResults;
+            if (!analysisResults || !analyzedTicker) return;
             
             if (etfNumber === 1) {
-                document.getElementById('etf1-nav-decay').value = (results.navDecay * 100).toFixed(2);
-                document.getElementById('etf1-dist-rate').value = (results.distRate * 100).toFixed(3);
-                document.getElementById('etf1-dist-decay').value = (results.distDecay * 100).toFixed(2);
+                etfNames.etf1 = analyzedTicker;
+                document.getElementById('etf1-title').textContent = analyzedTicker;
+                document.getElementById('etf1-summary-title').textContent = `${analyzedTicker} Total Distributions`;
             } else if (etfNumber === 2) {
-                document.getElementById('etf2-nav-decay').value = (results.navDecay * 100).toFixed(2);
-                document.getElementById('etf2-dist-rate').value = (results.distRate * 100).toFixed(3);
-                document.getElementById('etf2-dist-decay').value = (results.distDecay * 100).toFixed(2);
+                etfNames.etf2 = analyzedTicker;
+                document.getElementById('etf2-title').textContent = analyzedTicker;
+                document.getElementById('etf2-summary-title').textContent = `${analyzedTicker} Total Distributions`;
             }
+            
+            document.getElementById('comparison-title').textContent = `${etfNames.etf1} vs ${etfNames.etf2} Comparison`;
             
             // Disable apply buttons after applying
             document.getElementById('apply-etf1-btn').disabled = true;
             document.getElementById('apply-etf2-btn').disabled = true;
             analysisResults = null;
+            analyzedTicker = null;
             
-            calculate();
+            calculate(); // Recalculate with new names
         }
         
         // Set ticker and load data
@@ -1014,6 +1017,7 @@
                 }
                 
                 // Store results
+                analyzedTicker = ticker;
                 analysisResults = {
                     navDecay: avgNavDecay,
                     distRate: avgDistRate,
