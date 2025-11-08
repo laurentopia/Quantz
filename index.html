@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ETF Distribution & NAV Comparator v9</title>
+    <title>ETF Distribution & NAV Comparator v10</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * {
@@ -350,7 +350,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>ETF Distribution & NAV Comparator v9</h1>
+        <h1>ETF Distribution & NAV Comparator v10</h1>
         
         <div class="ticker-tool">
             <h3>Yahoo Finance Analysis</h3>
@@ -868,29 +868,38 @@
         }
         
         // Apply analysis results to ETF
-        function applyToETF(etfNumber) {
-            if (!analysisResults || !analyzedTicker) return;
-            
-            if (etfNumber === 1) {
-                etfNames.etf1 = analyzedTicker;
-                document.getElementById('etf1-title').textContent = analyzedTicker;
-                document.getElementById('etf1-summary-title').textContent = `${analyzedTicker} Total Distributions`;
-            } else if (etfNumber === 2) {
-                etfNames.etf2 = analyzedTicker;
-                document.getElementById('etf2-title').textContent = analyzedTicker;
-                document.getElementById('etf2-summary-title').textContent = `${analyzedTicker} Total Distributions`;
-            }
-            
-            document.getElementById('comparison-title').textContent = `${etfNames.etf1} vs ${etfNames.etf2} Comparison`;
-            
-            // Disable apply buttons after applying
-            document.getElementById('apply-etf1-btn').disabled = true;
-            document.getElementById('apply-etf2-btn').disabled = true;
-            analysisResults = null;
-            analyzedTicker = null;
-            
-            calculate(); // Recalculate with new names
-        }
+		function applyToETF(etfNumber) {
+			if (!analysisResults || !analyzedTicker) return;
+
+			// Update the actual input fields with analysis results
+			if (etfNumber === 1) {
+				document.getElementById('etf1-nav-decay').value = (analysisResults.navDecay * 100).toFixed(3);
+				document.getElementById('etf1-dist-rate').value = (analysisResults.distRate * 100).toFixed(3);
+				document.getElementById('etf1-dist-decay').value = (analysisResults.distDecay * 100).toFixed(3);
+
+				etfNames.etf1 = analyzedTicker;
+				document.getElementById('etf1-title').textContent = analyzedTicker;
+				document.getElementById('etf1-summary-title').textContent = `${analyzedTicker} Total Distributions`;
+			} else if (etfNumber === 2) {
+				document.getElementById('etf2-nav-decay').value = (analysisResults.navDecay * 100).toFixed(3);
+				document.getElementById('etf2-dist-rate').value = (analysisResults.distRate * 100).toFixed(3);
+				document.getElementById('etf2-dist-decay').value = (analysisResults.distDecay * 100).toFixed(3);
+
+				etfNames.etf2 = analyzedTicker;
+				document.getElementById('etf2-title').textContent = analyzedTicker;
+				document.getElementById('etf2-summary-title').textContent = `${analyzedTicker} Total Distributions`;
+			}
+
+			document.getElementById('comparison-title').textContent = `${etfNames.etf1} vs ${etfNames.etf2} Comparison`;
+
+			// Disable apply buttons after applying
+			document.getElementById('apply-etf1-btn').disabled = true;
+			document.getElementById('apply-etf2-btn').disabled = true;
+			analysisResults = null;
+			analyzedTicker = null;
+
+			calculate(); // Recalculate with new values
+		}
         
         // Set ticker and load data
         function setTickerAndLoad(ticker) {
@@ -955,13 +964,11 @@
                 
                 // Extract weekly price data
                 const weeklyPrices = [];
-                
                 for (let i = 0; i < timestamps.length; i += 7) {
                     if (quotes.close && quotes.close[i]) {
                         weeklyPrices.push(quotes.close[i]);
                     }
                 }
-                
                 if (weeklyPrices.length < 2) {
                     throw new Error(`Not enough weekly data points. Found ${weeklyPrices.length} weeks. Try a longer date range (at least 3 months).`);
                 }
@@ -989,7 +996,6 @@
 						const idx = times.reduce((best, t, i) => Math.abs(t - d.date) < Math.abs(times[best] - d.date) ? i : best, 0);
 						return prices[idx] > 0 ? d.amount / prices[idx] : 0;
 					});
-
 					totalDividends = dividends.reduce((s, d) => s + d.amount, 0);
 					dividendCount = dividends.length;
 					avgDistRate = rates.reduce((s, r) => s + r, 0) / (rates.length || 1);
@@ -998,8 +1004,8 @@
 					if (dividends.length >= 2) {
 						const decays = [];
 						for (let i = 1; i < dividends.length; i++) {
-							const p = dividends[i - 1].amount, c = dividends[i].amount, t = (dividends[i].date - dividends[i - 1].date) / 604800;
-							if (p > 0 && t > 0) decays.push(((p - c) / p) / t);
+							const p = dividends[i-1].amount, c = dividends[i].amount, t = (dividends[i].date-dividends[i-1].date)/604800;
+							if (p>0 && t>0) decays.push(((p-c)/p)/t);
 						}
 						distDecay = decays.reduce((s, d) => s + d, 0) / (decays.length || 1);
 					}
