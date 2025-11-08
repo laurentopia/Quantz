@@ -989,15 +989,24 @@
                     const weeks = weeklyPrices.length - 1;
                     avgDistRate = (totalDividends / weeks) / avgPrice;
                     
-                    if (dividends.length >= 2) {
-                        const firstHalf = dividends.slice(0, Math.ceil(dividends.length / 2));
-                        const secondHalf = dividends.slice(Math.floor(dividends.length / 2));
-                        const avgFirst = firstHalf.reduce((sum, div) => sum + div.amount, 0) / firstHalf.length;
-                        const avgSecond = secondHalf.reduce((sum, div) => sum + div.amount, 0) / secondHalf.length;
-                        if (avgFirst > 0) {
-                            distDecay = Math.max(0, (avgFirst - avgSecond) / avgFirst / (weeks / 2));
+                if (dividends.length >= 2) {
+                    let totalDistDecay = 0;
+                    let validDecays = 0;
+                    
+                    for (let i = 1; i < dividends.length; i++) {
+                        const prevAmount = dividends[i-1].amount;
+                        const currAmount = dividends[i].amount;
+                        const timeDiff = dividends[i].date - dividends[i-1].date;
+                        const weeksBetween = timeDiff / (7 * 24 * 60 * 60);
+                        
+                        if (prevAmount > 0 && weeksBetween > 0) {
+                            const periodDecay = (prevAmount - currAmount) / prevAmount;
+                            totalDistDecay += periodDecay / weeksBetween;
+                            validDecays++;
                         }
-                    }
+                    }   
+                    distDecay = validDecays > 0 ? totalDistDecay / validDecays : 0;
+                }
                 } else {
                     // Estimate from adjusted close if no dividends
                     if (indicators.adjclose && indicators.adjclose[0].adjclose) {
