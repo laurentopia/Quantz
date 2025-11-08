@@ -1,1033 +1,1092 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ETF Distribution & NAV Comparator v10.1</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-        }
-        
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            padding: 30px;
-        }
-        
-        h1 {
-            text-align: center;
-            color: #333;
-            margin-bottom: 30px;
-            font-size: 28px;
-        }
-        
-        .ticker-tool {
-            margin-bottom: 30px;
-            padding: 20px;
-            background: #f0f0f0;
-            border-radius: 8px;
-        }
-        
-        .ticker-tool h3 {
-            margin-bottom: 15px;
-            color: #333;
-        }
-        
-        .ticker-inputs {
-            display: grid;
-            grid-template-columns: 2fr 1fr 1fr 1fr;
-            gap: 10px;
-            align-items: end;
-        }
-        
-        .ticker-inputs input, .ticker-inputs button {
-            margin-bottom: 0;
-        }
-        
-        .apply-buttons {
-            margin-top: 15px;
-            display: flex;
-            gap: 10px;
-        }
-        
-        .apply-buttons button {
-            flex: 1;
-            padding: 12px;
-            font-size: 14px;
-        }
-        
-        .apply-buttons button:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-            opacity: 0.6;
-        }
-        
-        .timeframe {
-            margin-bottom: 20px;
-            text-align: center;
-        }
-        
-        .timeframe input {
-            width: 200px;
-            margin: 0 auto;
-        }
-        
-        .controls {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 30px;
-            margin-bottom: 30px;
-        }
-        
-        .etf-panel {
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 20px;
-            border: 2px solid #e0e0e0;
-        }
-        
-        .etf-panel h2 {
-            color: #333;
-            margin-bottom: 15px;
-            font-size: 20px;
-        }
-        
-        .initial-investment {
-            text-align: center;
-            margin-bottom: 20px;
-            padding: 15px;
-            background: #e9ecef;
-            border-radius: 8px;
-        }
-        
-        .initial-investment input {
-            width: 150px;
-            margin: 0 auto;
-            font-size: 18px;
-            font-weight: bold;
-        }
-        
-        .input-group {
-            margin-bottom: 15px;
-        }
-        
-        label {
-            display: block;
-            color: #555;
-            font-size: 13px;
-            font-weight: 600;
-            margin-bottom: 5px;
-        }
-        
-        input {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 14px;
-        }
-        
-        input:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-        
-        .chart-container {
-            position: relative;
-            height: 500px;
-            margin-bottom: 30px;
-        }
-        
-        .summary {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 30px;
-            margin-top: 30px;
-        }
-        
-        .summary-box {
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 20px;
-            text-align: center;
-        }
-        
-        .summary-box h3 {
-            color: #333;
-            margin-bottom: 10px;
-            font-size: 18px;
-        }
-        
-        .summary-value {
-            font-size: 24px;
-            font-weight: bold;
-            color: #667eea;
-        }
-        
-        .summary-label {
-            font-size: 13px;
-            color: #777;
-            margin-top: 5px;
-        }
-        
-        .delta-comparison {
-            margin-top: 15px;
-            padding: 10px;
-            background: #d4edda;
-            border-radius: 4px;
-            font-size: 14px;
-            font-weight: bold;
-        }
-        
-        .delta-positive {
-            color: #155724;
-            background: #d4edda;
-        }
-        
-        .delta-negative {
-            color: #721c24;
-            background: #f8d7da;
-        }
-        
-        button {
-            padding: 10px 20px;
-            background: #667eea;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: 600;
-        }
-        
-        button:hover:not(:disabled) {
-            background: #5a6fd8;
-        }
-        
-        button:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-            opacity: 0.6;
-        }
-        
-        .decouple-toggle {
-            margin-bottom: 15px;
-        }
-        
-        .decouple-toggle label {
-            display: flex;
-            align-items: center;
-            cursor: pointer;
-        }
-        
-        .decouple-toggle input[type="checkbox"] {
-            width: auto;
-            margin-right: 10px;
-        }
-        
-        .hidden {
-            display: none;
-        }
-        
-        .url-share {
-            margin-top: 20px;
-            text-align: center;
-        }
-        
-        .url-share button {
-            background: #28a745;
-        }
-        
-        .url-share button:hover {
-            background: #218838;
-        }
-        
-        .error {
-            color: #dc3545;
-            font-size: 14px;
-            margin-top: 10px;
-        }
-        
-        .info {
-            color: #856404;
-            background: #fff3cd;
-            border: 1px solid #ffeaa7;
-            padding: 10px;
-            border-radius: 4px;
-            font-size: 13px;
-            margin-top: 10px;
-        }
-        
-        .success {
-            color: #155724;
-            background: #d4edda;
-            border: 1px solid #c3e6cb;
-            padding: 10px;
-            border-radius: 4px;
-            font-size: 13px;
-            margin-top: 10px;
-        }
-        
-        .loading {
-            color: #004085;
-            background: #cce5ff;
-            border: 1px solid #b8daff;
-            padding: 10px;
-            border-radius: 4px;
-            font-size: 13px;
-            margin-top: 10px;
-        }
-        
-        .proxy-status {
-            font-size: 11px;
-            color: #666;
-            margin-top: 5px;
-        }
-        
-        .quick-tickers {
-            margin-top: 10px;
-            display: flex;
-            gap: 5px;
-            flex-wrap: wrap;
-        }
-        
-        .quick-tickers button {
-            padding: 5px 10px;
-            font-size: 12px;
-            background: #6c757d;
-        }
-        
-        .quick-tickers button:hover {
-            background: #5a6268;
-        }
-        
-        .analysis-results {
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
-            padding: 15px;
-            margin-top: 15px;
-            font-size: 13px;
-        }
-        
-        .analysis-results h4 {
-            margin-bottom: 10px;
-            color: #495057;
-        }
-        
-        .analysis-results .metric {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 5px;
-        }
-        
-        .analysis-results .metric:last-child {
-            margin-bottom: 0;
-        }
-        
-        .analysis-results .metric-name {
-            font-weight: 600;
-        }
-        
-        .analysis-results .metric-value {
-            color: #007bff;
-        }
-    </style>
-<base target="_blank">
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>ETF Distribution & NAV Comparator v12</title>
+	<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+	<style>
+		* {
+			margin: 0;
+			padding: 0;
+			box-sizing: border-box;
+		}
+
+		.frequency-badge {
+			display: inline-block;
+			background: #667eea;
+			color: white;
+			padding: 4px 12px;
+			border-radius: 20px;
+			font-size: 0.85em;
+			font-weight: 600;
+			margin-left: 10px;
+			vertical-align: middle;
+		}
+		body {
+			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+			background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+			min-height: 100vh;
+			padding: 20px;
+		}
+
+		.container {
+			max-width: 1400px;
+			margin: 0 auto;
+			background: white;
+			border-radius: 12px;
+			box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+			padding: 30px;
+		}
+
+		h1 {
+			text-align: center;
+			color: #333;
+			margin-bottom: 30px;
+			font-size: 28px;
+		}
+
+		.ticker-tool {
+			margin-bottom: 30px;
+			padding: 20px;
+			background: #f0f0f0;
+			border-radius: 8px;
+		}
+
+		.ticker-tool h3 {
+			margin-bottom: 15px;
+			color: #333;
+		}
+
+		.ticker-inputs {
+			display: grid;
+			grid-template-columns: 2fr 1fr 1fr 1fr;
+			gap: 10px;
+			align-items: end;
+		}
+
+		.ticker-inputs input, .ticker-inputs button {
+			margin-bottom: 0;
+		}
+
+		.apply-buttons {
+			margin-top: 15px;
+			display: flex;
+			gap: 10px;
+		}
+
+		.apply-buttons button {
+			flex: 1;
+			padding: 12px;
+			font-size: 14px;
+		}
+
+		.apply-buttons button:disabled {
+			background: #ccc;
+			cursor: not-allowed;
+			opacity: 0.6;
+		}
+
+		.timeframe {
+			margin-bottom: 20px;
+			text-align: center;
+		}
+
+		.timeframe input {
+			width: 200px;
+			margin: 0 auto;
+		}
+
+		.controls {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 30px;
+			margin-bottom: 30px;
+		}
+
+		.etf-panel {
+			background: #f8f9fa;
+			border-radius: 8px;
+			padding: 20px;
+			border: 2px solid #e0e0e0;
+		}
+
+		.etf-panel h2 {
+			color: #333;
+			margin-bottom: 15px;
+			font-size: 20px;
+		}
+
+		.initial-investment {
+			text-align: center;
+			margin-bottom: 20px;
+			padding: 15px;
+			background: #e9ecef;
+			border-radius: 8px;
+		}
+
+		.initial-investment input {
+			width: 150px;
+			margin: 0 auto;
+			font-size: 18px;
+			font-weight: bold;
+		}
+
+		.input-group {
+			margin-bottom: 15px;
+		}
+
+		label {
+			display: block;
+			color: #555;
+			font-size: 13px;
+			font-weight: 600;
+			margin-bottom: 5px;
+		}
+
+		input {
+			width: 100%;
+			padding: 10px;
+			border: 1px solid #ddd;
+			border-radius: 4px;
+			font-size: 14px;
+		}
+
+		input:focus {
+			outline: none;
+			border-color: #667eea;
+		}
+
+		.chart-container {
+			position: relative;
+			height: 500px;
+			margin-bottom: 30px;
+		}
+
+		.summary {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 30px;
+			margin-top: 30px;
+		}
+
+		.summary-box {
+			background: #f8f9fa;
+			border-radius: 8px;
+			padding: 20px;
+			text-align: center;
+		}
+
+		.summary-box h3 {
+			color: #333;
+			margin-bottom: 10px;
+			font-size: 18px;
+		}
+
+		.summary-value {
+			font-size: 24px;
+			font-weight: bold;
+			color: #667eea;
+		}
+
+		.summary-label {
+			font-size: 13px;
+			color: #777;
+			margin-top: 5px;
+		}
+
+		.delta-comparison {
+			margin-top: 15px;
+			padding: 10px;
+			background: #d4edda;
+			border-radius: 4px;
+			font-size: 14px;
+			font-weight: bold;
+		}
+
+		.delta-positive {
+			color: #155724;
+			background: #d4edda;
+		}
+
+		.delta-negative {
+			color: #721c24;
+			background: #f8d7da;
+		}
+
+		button {
+			padding: 10px 20px;
+			background: #667eea;
+			color: white;
+			border: none;
+			border-radius: 4px;
+			cursor: pointer;
+			font-weight: 600;
+		}
+
+		button:hover:not(:disabled) {
+			background: #5a6fd8;
+		}
+
+		button:disabled {
+			background: #ccc;
+			cursor: not-allowed;
+			opacity: 0.6;
+		}
+
+		.decouple-toggle {
+			margin-bottom: 15px;
+		}
+
+		.decouple-toggle label {
+			display: flex;
+			align-items: center;
+			cursor: pointer;
+		}
+
+		.decouple-toggle input[type="checkbox"] {
+			width: auto;
+			margin-right: 10px;
+		}
+
+		.hidden {
+			display: none;
+		}
+
+		.url-share {
+			margin-top: 20px;
+			text-align: center;
+		}
+
+		.url-share button {
+			background: #28a745;
+		}
+
+		.url-share button:hover {
+			background: #218838;
+		}
+
+		.error {
+			color: #dc3545;
+			font-size: 14px;
+			margin-top: 10px;
+		}
+
+		.info {
+			color: #856404;
+			background: #fff3cd;
+			border: 1px solid #ffeaa7;
+			padding: 10px;
+			border-radius: 4px;
+			font-size: 13px;
+			margin-top: 10px;
+		}
+
+		.success {
+			color: #155724;
+			background: #d4edda;
+			border: 1px solid #c3e6cb;
+			padding: 10px;
+			border-radius: 4px;
+			font-size: 13px;
+			margin-top: 10px;
+		}
+
+		.loading {
+			color: #004085;
+			background: #cce5ff;
+			border: 1px solid #b8daff;
+			padding: 10px;
+			border-radius: 4px;
+			font-size: 13px;
+			margin-top: 10px;
+		}
+
+		.proxy-status {
+			font-size: 11px;
+			color: #666;
+			margin-top: 5px;
+		}
+
+		.quick-tickers {
+			margin-top: 10px;
+			display: flex;
+			gap: 5px;
+			flex-wrap: wrap;
+		}
+
+		.quick-tickers button {
+			padding: 5px 10px;
+			font-size: 12px;
+			background: #6c757d;
+		}
+
+		.quick-tickers button:hover {
+			background: #5a6268;
+		}
+
+		.analysis-results {
+			background: #f8f9fa;
+			border: 1px solid #dee2e6;
+			border-radius: 4px;
+			padding: 15px;
+			margin-top: 15px;
+			font-size: 13px;
+		}
+
+		.analysis-results h4 {
+			margin-bottom: 10px;
+			color: #495057;
+		}
+
+		.analysis-results .metric {
+			display: flex;
+			justify-content: space-between;
+			margin-bottom: 5px;
+		}
+
+		.analysis-results .metric:last-child {
+			margin-bottom: 0;
+		}
+
+		.analysis-results .metric-name {
+			font-weight: 600;
+		}
+
+		.analysis-results .metric-value {
+			color: #007bff;
+		}
+	</style>
+	<base target="_blank">
 </head>
 <body>
-    <div class="container">
-        <h1>ETF Distribution & NAV Comparator v10.1</h1>
-        
-        <div class="ticker-tool">
-            <h3>Yahoo Finance Analysis</h3>
-            <div id="ticker-error" class="error"></div>
-            <div id="ticker-info" class="info" style="display: none;"></div>
-            <div id="ticker-success" class="success" style="display: none;"></div>
-            <div id="ticker-loading" class="loading" style="display: none;">
-                Attempting to fetch data...
-            </div>
-            <div class="ticker-inputs">
-                <div class="input-group">
-                    <label>Ticker Symbol</label>
-                    <input type="text" id="ticker" placeholder="e.g., JEPY, QQQY, JEPI, SPY">
-                </div>
-                <div class="input-group">
-                    <label>Start Date</label>
-                    <input type="date" id="start-date">
-                </div>
-                <div class="input-group">
-                    <label>End Date</label>
-                    <input type="date" id="end-date">
-                </div>
-                <button onclick="analyzeTicker()" id="analyze-btn">Analyze Ticker</button>
-            </div>
-            <div class="quick-tickers">
-                <button onclick="setTickerAndLoad('JEPY')">JEPY</button>
-                <button onclick="setTickerAndLoad('QQQY')">QQQY</button>
-                <button onclick="setTickerAndLoad('JEPI')">JEPI</button>
-                <button onclick="setTickerAndLoad('SPY')">SPY</button>
-                <button onclick="setTickerAndLoad('QQQ')">QQQ</button>
-                <button onclick="setTickerAndLoad('MAIN')">MAIN</button>
-                <button onclick="setTickerAndLoad('ULTY')">ULTY</button>
-                <button onclick="setTickerAndLoad('BLOX')">BLOX</button>
-                <button onclick="setTickerAndLoad('KYLD')">KYLD</button>
-                <button onclick="setTickerAndLoad('ULTI')">ULTI</button>
-            </div>
-            <div class="apply-buttons">
-                <button onclick="applyToETF(1)" disabled id="apply-etf1-btn">→ Apply to ETF 1</button>
-                <button onclick="applyToETF(2)" disabled id="apply-etf2-btn">→ Apply to ETF 2</button>
-            </div>
-            <div class="proxy-status" id="proxy-status"></div>
-        </div>
-        
-        <div class="timeframe">
-            <div class="input-group">
-                <label for="timeframe">Time Frame (Weeks)</label>
-                <input type="number" id="timeframe" value="52" min="1" max="520">
-            </div>
-        </div>
-        
-        <div class="initial-investment">
-            <div class="input-group">
-                <label for="initial-investment">Initial Investment ($)</label>
-                <input type="number" id="initial-investment" value="10000" step="100" min="100">
-            </div>
-        </div>
-        
-        <div class="controls">
-            <div class="etf-panel" id="etf1-panel">
-                <h2 id="etf1-title">ETF 1</h2>
-                <div class="decouple-toggle">
-                    <label>
-                        <input type="checkbox" id="etf1-decouple">
-                        Decouple Yield from NAV
-                    </label>
-                </div>
-                <div class="input-group">
-                    <label for="etf1-nav-decay">NAV Decay Rate (%/week)</label>
-                    <input type="number" id="etf1-nav-decay" value="0.5" step="0.01">
-                </div>
-                <div class="input-group" id="etf1-dist-rate-group">
-                    <label for="etf1-dist-rate">Distribution Rate (%/week)</label>
-                    <input type="number" id="etf1-dist-rate" value="2.0" step="0.01">
-                </div>
-                <div class="input-group hidden" id="etf1-abs-dist-group">
-                    <label for="etf1-abs-dist">Absolute Distribution ($/week)</label>
-                    <input type="number" id="etf1-abs-dist" value="2.0" step="0.01">
-                </div>
-                <div class="input-group">
-                    <label for="etf1-dist-decay">Distribution Decay Rate (%/week)</label>
-                    <input type="number" id="etf1-dist-decay" value="0.1" step="0.01">
-                </div>
-            </div>
-            
-            <div class="etf-panel" id="etf2-panel">
-                <h2 id="etf2-title">ETF 2</h2>
-                <div class="decouple-toggle">
-                    <label>
-                        <input type="checkbox" id="etf2-decouple">
-                        Decouple Yield from NAV
-                    </label>
-                </div>
-                <div class="input-group">
-                    <label for="etf2-nav-decay">NAV Decay Rate (%/week)</label>
-                    <input type="number" id="etf2-nav-decay" value="0.1" step="0.01">
-                </div>
-                <div class="input-group" id="etf2-dist-rate-group">
-                    <label for="etf2-dist-rate">Distribution Rate (%/week)</label>
-                    <input type="number" id="etf2-dist-rate" value="1.0" step="0.01">
-                </div>
-                <div class="input-group hidden" id="etf2-abs-dist-group">
-                    <label for="etf2-abs-dist">Absolute Distribution ($/week)</label>
-                    <input type="number" id="etf2-abs-dist" value="1.0" step="0.01">
-                </div>
-                <div class="input-group">
-                    <label for="etf2-dist-decay">Distribution Decay Rate (%/week)</label>
-                    <input type="number" id="etf2-dist-decay" value="0.0" step="0.01">
-                </div>
-            </div>
-        </div>
-        
-        <div class="chart-container">
-            <canvas id="chart"></canvas>
-        </div>
-        
-        <div class="summary">
-            <div class="summary-box">
-                <h3 id="etf1-summary-title">ETF 1 Total Distributions</h3>
-                <div class="summary-value" id="etf1-total-dist">$0.00</div>
-                <div class="summary-label">Reinvesting not included</div>
-                <div style="margin-top: 10px;">
-                    <div class="summary-label">Final Value (No DRIP)</div>
-                    <div class="summary-value" id="etf1-final-value" style="font-size: 18px; color: #555;">$0.00</div>
-                </div>
-                <div style="margin-top: 10px;">
-                    <div class="summary-label">Total Return</div>
-                    <div class="summary-value" id="etf1-total-return" style="font-size: 20px; color: #28a745;">$0.00</div>
-                </div>
-                <div style="margin-top: 10px;">
-                    <div class="summary-label">DRIP Final Value</div>
-                    <div class="summary-value" id="etf1-drip-value" style="font-size: 18px; color: #dc3545;">$0.00</div>
-                </div>
-            </div>
-            
-            <div class="summary-box">
-                <h3 id="etf2-summary-title">ETF 2 Total Distributions</h3>
-                <div class="summary-value" id="etf2-total-dist">$0.00</div>
-                <div class="summary-label">Reinvesting not included</div>
-                <div style="margin-top: 10px;">
-                    <div class="summary-label">Final Value (No DRIP)</div>
-                    <div class="summary-value" id="etf2-final-value" style="font-size: 18px; color: #555;">$0.00</div>
-                </div>
-                <div style="margin-top: 10px;">
-                    <div class="summary-label">Total Return</div>
-                    <div class="summary-value" id="etf2-total-return" style="font-size: 20px; color: #28a745;">$0.00</div>
-                </div>
-                <div style="margin-top: 10px;">
-                    <div class="summary-label">DRIP Final Value</div>
-                    <div class="summary-value" id="etf2-drip-value" style="font-size: 18px; color: #dc3545;">$0.00</div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="delta-comparison" id="delta-comparison">
-            <h3 style="text-align: center; margin-bottom: 15px;" id="comparison-title">ETF 1 vs ETF 2 Comparison</h3>
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;">
-                <div style="text-align: center;">
-                    <div class="summary-label">Total Distributions</div>
-                    <div class="summary-value" id="delta-distributions">0%</div>
-                </div>
-                <div style="text-align: center;">
-                    <div class="summary-label">Final Value (No DRIP)</div>
-                    <div class="summary-value" id="delta-final-value">0%</div>
-                </div>
-                <div style="text-align: center;">
-                    <div class="summary-label">DRIP Final Value</div>
-                    <div class="summary-value" id="delta-drip-value">0%</div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="url-share">
-            <button onclick="shareSimulation()">Copy Share URL</button>
-            <div id="url-status" style="margin-top: 10px; font-size: 14px; color: #28a745;"></div>
-        </div>
-    </div>
-    
-    <script>
-        // Initialize chart
-        const ctx = document.getElementById('chart').getContext('2d');
-        const chart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: [],
-                datasets: []
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                animation: false,
-                interaction: {
-                    mode: 'index',
-                    intersect: false,
-                },
-                plugins: {
-                    legend: {
-                        position: 'top',
-                    },
-                    title: {
-                        display: true,
-                        text: 'ETF Performance Comparison'
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                return context.dataset.label + ': $' + context.parsed.y.toFixed(2);
-                            }
-                        }
-                    }
-                },
-                scales: {
-                    x: {
-                        display: true,
-                        title: {
-                            display: true,
-                            text: 'Weeks'
-                        }
-                    },
-                    y: {
-                        display: true,
-                        title: {
-                            display: true,
-                            text: 'Value ($)'
-                        }
-                    }
-                }
-            }
-        });
-        
-        // Colors
-        const colors = {
-            etf1: {
-                nav: 'rgb(54, 162, 235)',
-                dist: 'rgba(54, 162, 235, 0.5)',
-                drip: 'rgb(54, 162, 235)'
-            },
-            etf2: {
-                nav: 'rgb(255, 99, 132)',
-                dist: 'rgba(255, 99, 132, 0.5)',
-                drip: 'rgb(255, 99, 132)'
-            }
-        };
-        
-        // Proxy configuration
-        const PROXY_ENDPOINTS = [
-            {
-                name: 'AllOrigins',
-                url: (target) => `https://api.allorigins.win/raw?url=${encodeURIComponent(target)}`,
-                method: 'fetch'
-            },
-            {
-                name: 'CORS Proxy',
-                url: (target) => `https://corsproxy.io/?${encodeURIComponent(target)}`,
-                method: 'fetch'
-            },
-            {
-                name: 'JSONP Fetch',
-                url: (target) => `${target}&callback=?`,
-                method: 'jsonp'
-            }
-        ];
-        
-        let currentProxyIndex = 0;
-        let analysisResults = null;
-        let etfNames = { etf1: 'ETF 1', etf2: 'ETF 2' };
-        let analyzedTicker = null;
-        
-        // Utility functions
-        function debounce(func, wait) {
-            let timeout;
-            return function executedFunction(...args) {
-                const later = () => {
-                    clearTimeout(timeout);
-                    func(...args);
-                };
-                clearTimeout(timeout);
-                timeout = setTimeout(later, wait);
-            };
-        }
-        
-        // JSONP fetch function
-        function jsonpFetch(url) {
-            return new Promise((resolve, reject) => {
-                const callbackName = 'jsonp_callback_' + Math.round(100000 * Math.random());
-                const script = document.createElement('script');
-                
-                window[callbackName] = function(data) {
-                    delete window[callbackName];
-                    document.body.removeChild(script);
-                    resolve({ ok: true, json: () => Promise.resolve(data) });
-                };
-                
-                script.src = url.replace('callback=?', `callback=${callbackName}`);
-                script.onerror = () => {
-                    delete window[callbackName];
-                    document.body.removeChild(script);
-                    reject(new Error('JSONP failed'));
-                };
-                
-                document.body.appendChild(script);
-            });
-        }
-        
-        // Smart fetch with proxy rotation
-        async function smartFetch(url) {
-            const endpoint = PROXY_ENDPOINTS[currentProxyIndex];
-            console.log(`Trying ${endpoint.name}...`);
-            
-            document.getElementById('proxy-status').textContent = `Using proxy: ${endpoint.name}`;
-            
-            try {
-                if (endpoint.method === 'jsonp') {
-                    return await jsonpFetch(url);
-                } else {
-                    const proxiedUrl = endpoint.url(url);
-                    const response = await fetch(proxiedUrl);
-                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                    return response;
-                }
-            } catch (error) {
-                currentProxyIndex = (currentProxyIndex + 1) % PROXY_ENDPOINTS.length;
-                if (currentProxyIndex === 0) {
-                    throw new Error('All proxies failed');
-                }
-                return smartFetch(url);
-            }
-        }
-        
-        // Main calculation function
-        function calculate() {
-            const weeks = parseInt(document.getElementById('timeframe').value) || 52;
-            const initialInvestment = parseFloat(document.getElementById('initial-investment').value) || 10000;
-            
-            // Get ETF1 values
-            const etf1 = {
-                navDecay: parseFloat(document.getElementById('etf1-nav-decay').value) / 100 || 0,
-                distRate: parseFloat(document.getElementById('etf1-dist-rate').value) / 100 || 0,
-                distDecay: parseFloat(document.getElementById('etf1-dist-decay').value) / 100 || 0,
-                decoupled: document.getElementById('etf1-decouple').checked,
-                absDist: parseFloat(document.getElementById('etf1-abs-dist').value) || 0
-            };
-            
-            // Get ETF2 values
-            const etf2 = {
-                navDecay: parseFloat(document.getElementById('etf2-nav-decay').value) / 100 || 0,
-                distRate: parseFloat(document.getElementById('etf2-dist-rate').value) / 100 || 0,
-                distDecay: parseFloat(document.getElementById('etf2-dist-decay').value) / 100 || 0,
-                decoupled: document.getElementById('etf2-decouple').checked,
-                absDist: parseFloat(document.getElementById('etf2-abs-dist').value) || 0
-            };
-            
-            // Generate data
-            const labels = [];
-            const etf1Value = [];
-            const etf1CumDist = [];
-            const etf1Drip = [];
-            const etf2Value = [];
-            const etf2CumDist = [];
-            const etf2Drip = [];
-            
-            // ETF1 calculations
-            let value1 = initialInvestment;
-            let cumDist1 = 0;
-            let shares1 = 1;
-            let dripValue1 = initialInvestment;
-            
-            // ETF2 calculations
-            let value2 = initialInvestment;
-            let cumDist2 = 0;
-            let shares2 = 1;
-            let dripValue2 = initialInvestment;
-            
-            for (let w = 0; w <= weeks; w++) {
-                labels.push(w);
-                
-                // Store current value
-                etf1Value.push(value1);
-                etf2Value.push(value2);
-                
-                // Calculate distributions for this week
-                let dist1;
-                if (etf1.decoupled) {
-                    const currentAbsDist = etf1.absDist * Math.pow(1 - etf1.distDecay, w);
-                    dist1 = currentAbsDist * initialInvestment / 100; // Convert to dollar amount
-                } else {
-                    const currentDistRate = etf1.distRate * Math.pow(1 - etf1.distDecay, w);
-                    dist1 = value1 * currentDistRate;
-                }
-                
-                let dist2;
-                if (etf2.decoupled) {
-                    const currentAbsDist = etf2.absDist * Math.pow(1 - etf2.distDecay, w);
-                    dist2 = currentAbsDist * initialInvestment / 100; // Convert to dollar amount
-                } else {
-                    const currentDistRate = etf2.distRate * Math.pow(1 - etf2.distDecay, w);
-                    dist2 = value2 * currentDistRate;
-                }
-                
-                // Update cumulative distributions
-                cumDist1 += dist1;
-                cumDist2 += dist2;
-                etf1CumDist.push(cumDist1);
-                etf2CumDist.push(cumDist2);
-                
-                // DRIP calculations
-                shares1 += dist1 / value1;
-                shares2 += dist2 / value2;
-                
-                dripValue1 = shares1 * value1;
-                dripValue2 = shares2 * value2;
-                
-                etf1Drip.push(dripValue1);
-                etf2Drip.push(dripValue2);
-                
-                // Update value for next week
-                value1 *= (1 - etf1.navDecay);
-                value2 *= (1 - etf2.navDecay);
-            }
-            
-            // Update summary
-            document.getElementById('etf1-total-dist').textContent = '$' + cumDist1.toFixed(2);
-            document.getElementById('etf1-final-value').textContent = '$' + etf1Value[etf1Value.length - 1].toFixed(2);
-            document.getElementById('etf1-total-return').textContent = '$' + (etf1Value[etf1Value.length - 1] + cumDist1).toFixed(2);
-            document.getElementById('etf1-drip-value').textContent = '$' + dripValue1.toFixed(2);
-            
-            document.getElementById('etf2-total-dist').textContent = '$' + cumDist2.toFixed(2);
-            document.getElementById('etf2-final-value').textContent = '$' + etf2Value[etf2Value.length - 1].toFixed(2);
-            document.getElementById('etf2-total-return').textContent = '$' + (etf2Value[etf2Value.length - 1] + cumDist2).toFixed(2);
-            document.getElementById('etf2-drip-value').textContent = '$' + dripValue2.toFixed(2);
-            
-            // Update delta comparison
-            const deltaDist = ((cumDist1 / cumDist2) * 100).toFixed(1);
-            const deltaFinalValue = ((etf1Value[etf1Value.length - 1] / etf2Value[etf2Value.length - 1]) * 100).toFixed(1);
-            const deltaDripValue = ((dripValue1 / dripValue2) * 100).toFixed(1);
-            
-            document.getElementById('delta-distributions').textContent = deltaDist + '%';
-            document.getElementById('delta-final-value').textContent = deltaFinalValue + '%';
-            document.getElementById('delta-drip-value').textContent = deltaDripValue + '%';
-            
-            // Color code deltas
-            const deltaElements = ['delta-distributions', 'delta-final-value', 'delta-drip-value'];
-            deltaElements.forEach(id => {
-                const element = document.getElementById(id);
-                const value = parseFloat(element.textContent);
-                element.parentElement.className = value > 100 ? 'delta-positive' : 'delta-negative';
-            });
-            
-            // Update chart
-            chart.data.labels = labels;
-            chart.data.datasets = [
-                {
-                    label: `${etfNames.etf1} Value`,
-                    data: etf1Value,
-                    borderColor: colors.etf1.nav,
-                    backgroundColor: 'transparent',
-                    borderWidth: 2,
-                    borderDash: [5, 5],
-                    pointRadius: 0,
-                    yAxisID: 'y',
-                },
-                {
-                    label: `${etfNames.etf1} Distributions`,
-                    data: etf1CumDist,
-                    borderColor: colors.etf1.dist,
-                    backgroundColor: colors.etf1.dist,
-                    fill: true,
-                    tension: 0.1,
-                    pointRadius: 0,
-                    yAxisID: 'y',
-                },
-                {
-                    label: `${etfNames.etf1} DRIP`,
-                    data: etf1Drip,
-                    borderColor: colors.etf1.drip,
-                    backgroundColor: 'transparent',
-                    pointHoverRadius: 6,
-                    borderWidth: 2,               
-                    pointRadius: 0,
-                    yAxisID: 'y',
-                },
-                {
-                    label: `${etfNames.etf2} Value`,
-                    data: etf2Value,
-                    borderColor: colors.etf2.nav,
-                    backgroundColor: 'transparent',
-                    borderWidth: 2,
-                    borderDash: [5, 5],
-                    pointRadius: 0,
-                    yAxisID: 'y',
-                },
-                {
-                    label: `${etfNames.etf2} Distributions`,
-                    data: etf2CumDist,
-                    borderColor: colors.etf2.dist,
-                    backgroundColor: colors.etf2.dist,
-                    fill: true,
-                    tension: 0.1,
-                    pointRadius: 0,
-                    yAxisID: 'y',
-                },
-                {
-                    label: `${etfNames.etf2} DRIP`,
-                    data: etf2Drip,
-                    borderColor: colors.etf2.drip,
-                    backgroundColor: 'transparent',
-                    pointHoverRadius: 6,
-                    borderWidth: 2,
-                    pointRadius: 0,
-                    yAxisID: 'y',
-                }
-            ];
-            
-            chart.update('none');
-            updateURL();
-        }
-        
-        // Apply analysis results to ETF
-		function applyToETF(etfNumber) {
-			if (!analysisResults || !analyzedTicker) return;
+<div class="container">
+	<h1>ETF Distribution & NAV Comparator v12</h1>
 
-			// Update the actual input fields with analysis results
-			if (etfNumber === 1) {
-				document.getElementById('etf1-nav-decay').value = (analysisResults.navDecay * 100).toFixed(3);
-				document.getElementById('etf1-dist-rate').value = (analysisResults.distRate * 100).toFixed(3);
-				document.getElementById('etf1-dist-decay').value = (analysisResults.distDecay * 100).toFixed(3);
+	<div class="ticker-tool">
+		<h3>Yahoo Finance Analysis</h3>
+		<div id="ticker-error" class="error"></div>
+		<div id="ticker-info" class="info" style="display: none;"></div>
+		<div id="ticker-success" class="success" style="display: none;"></div>
+		<div id="ticker-loading" class="loading" style="display: none;">
+			Attempting to fetch data...
+		</div>
+		<div class="ticker-inputs">
+			<div class="input-group">
+				<label>Ticker Symbol</label>
+				<input type="text" id="ticker" placeholder="e.g., JEPY, QQQY, JEPI, SPY">
+			</div>
+			<div class="input-group">
+				<label>Start Date</label>
+				<input type="date" id="start-date">
+			</div>
+			<div class="input-group">
+				<label>End Date</label>
+				<input type="date" id="end-date">
+			</div>
+			<button onclick="analyzeTicker()" id="analyze-btn">Analyze Ticker</button>
+		</div>
+		<div class="quick-tickers">
+			<button onclick="setTickerAndLoad('JEPY')">JEPY</button>
+			<button onclick="setTickerAndLoad('QQQY')">QQQY</button>
+			<button onclick="setTickerAndLoad('JEPI')">JEPI</button>
+			<button onclick="setTickerAndLoad('SPYI')">SPYI</button>
+			<button onclick="setTickerAndLoad('QQQI')">QQQI</button>
+			<button onclick="setTickerAndLoad('MAIN')">MAIN</button>
+			<button onclick="setTickerAndLoad('TSYY')">TSYY</button>
+			<button onclick="setTickerAndLoad('HOOW')">HOOW</button>
+			<button onclick="setTickerAndLoad('ULTY')">ULTY</button>
+			<button onclick="setTickerAndLoad('BLOX')">BLOX</button>
+			<button onclick="setTickerAndLoad('KYLD')">KYLD</button>
+			<button onclick="setTickerAndLoad('ULTI')">ULTI</button>
+		</div>
+		<div class="apply-buttons">
+			<button onclick="applyToETF(1)" disabled id="apply-etf1-btn">→ Apply to ETF 1</button>
+			<button onclick="applyToETF(2)" disabled id="apply-etf2-btn">→ Apply to ETF 2</button>
+		</div>
+		<div class="proxy-status" id="proxy-status"></div>
+	</div>
 
-				etfNames.etf1 = analyzedTicker;
-				document.getElementById('etf1-title').textContent = analyzedTicker;
-				document.getElementById('etf1-summary-title').textContent = `${analyzedTicker} Total Distributions`;
-			} else if (etfNumber === 2) {
-				document.getElementById('etf2-nav-decay').value = (analysisResults.navDecay * 100).toFixed(3);
-				document.getElementById('etf2-dist-rate').value = (analysisResults.distRate * 100).toFixed(3);
-				document.getElementById('etf2-dist-decay').value = (analysisResults.distDecay * 100).toFixed(3);
+	<div class="timeframe">
+		<div class="input-group">
+			<label for="timeframe">Time Frame (Weeks)</label>
+			<input type="number" id="timeframe" value="52" min="1" max="520">
+		</div>
+	</div>
 
-				etfNames.etf2 = analyzedTicker;
-				document.getElementById('etf2-title').textContent = analyzedTicker;
-				document.getElementById('etf2-summary-title').textContent = `${analyzedTicker} Total Distributions`;
-			}
+	<div class="initial-investment">
+		<div class="input-group">
+			<label for="initial-investment">Initial Investment ($)</label>
+			<input type="number" id="initial-investment" value="10000" step="100" min="100">
+		</div>
+	</div>
 
-			document.getElementById('comparison-title').textContent = `${etfNames.etf1} vs ${etfNames.etf2} Comparison`;
+	<div class="controls">
+		<div class="etf-panel" id="etf1-panel">
+			<h2 id="etf1-title">ETF 1</h2>
+			<div class="decouple-toggle">
+				<label>
+					<input type="checkbox" id="etf1-decouple">
+					Decouple Yield from NAV
+				</label>
+			</div>
+			<div class="input-group">
+				<label for="etf1-nav-decay">NAV Decay Rate (%/week)</label>
+				<input type="number" id="etf1-nav-decay" value="0.5" step="0.01">
+			</div>
+			<div class="input-group" id="etf1-dist-rate-group">
+				<label for="etf1-dist-rate">Distribution Rate (%/week)</label>
+				<input type="number" id="etf1-dist-rate" value="2.0" step="0.01">
+			</div>
+			<div class="input-group hidden" id="etf1-abs-dist-group">
+				<label for="etf1-abs-dist">Absolute Distribution (%/week)</label>
+				<input type="number" id="etf1-abs-dist" value="2.0" step="0.01">
+			</div>
+			<div class="input-group">
+				<label for="etf1-dist-decay">Distribution Decay Rate (%/week)</label>
+				<input type="number" id="etf1-dist-decay" value="0.1" step="0.01">
+			</div>
+		</div>
 
-			// Disable apply buttons after applying
-			document.getElementById('apply-etf1-btn').disabled = true;
-			document.getElementById('apply-etf2-btn').disabled = true;
-			analysisResults = null;
-			analyzedTicker = null;
+		<div class="etf-panel" id="etf2-panel">
+			<h2 id="etf2-title">ETF 2</h2>
+			<div class="decouple-toggle">
+				<label>
+					<input type="checkbox" id="etf2-decouple">
+					Decouple Yield from NAV
+				</label>
+			</div>
+			<div class="input-group">
+				<label for="etf2-nav-decay">NAV Decay Rate (%/week)</label>
+				<input type="number" id="etf2-nav-decay" value="0.1" step="0.01">
+			</div>
+			<div class="input-group" id="etf2-dist-rate-group">
+				<label for="etf2-dist-rate">Distribution Rate (%/week)</label>
+				<input type="number" id="etf2-dist-rate" value="1.0" step="0.01">
+			</div>
+			<div class="input-group hidden" id="etf2-abs-dist-group">
+				<label for="etf2-abs-dist">Absolute Distribution (%/week)</label>
+				<input type="number" id="etf2-abs-dist" value="1.0" step="0.01">
+			</div>
+			<div class="input-group">
+				<label for="etf2-dist-decay">Distribution Decay Rate (%/week)</label>
+				<input type="number" id="etf2-dist-decay" value="0.0" step="0.01">
+			</div>
+		</div>
+	</div>
 
-			calculate(); // Recalculate with new values
-		}
-        
-        // Set ticker and load data
-        function setTickerAndLoad(ticker) {
-            document.getElementById('ticker').value = ticker;
-        }
-        
-        // Yahoo Finance analysis with smart proxy rotation
-        async function analyzeTicker() {
-            const ticker = document.getElementById('ticker').value.toUpperCase();
-            const startDate = document.getElementById('start-date').value;
-            const endDate = document.getElementById('end-date').value;
-            const errorDiv = document.getElementById('ticker-error');
-            const infoDiv = document.getElementById('ticker-info');
-            const successDiv = document.getElementById('ticker-success');
-            const loadingDiv = document.getElementById('ticker-loading');
-            const analyzeBtn = document.getElementById('analyze-btn');
-            const applyBtn1 = document.getElementById('apply-etf1-btn');
-            const applyBtn2 = document.getElementById('apply-etf2-btn');
-            
-            errorDiv.textContent = '';
-            successDiv.textContent = '';
-            loadingDiv.style.display = 'block';
-            analyzeBtn.disabled = true;
-            applyBtn1.disabled = true;
-            applyBtn2.disabled = true;
-            
-            if (!ticker || !startDate || !endDate) {
-                errorDiv.textContent = 'Please fill all fields';
-                loadingDiv.style.display = 'none';
-                analyzeBtn.disabled = false;
-                return;
-            }
-            
-            try {
-                const period1 = Math.floor(new Date(startDate).getTime() / 1000);
-                const period2 = Math.floor(new Date(endDate).getTime() / 1000);
-                
-                const priceUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?period1=${period1}&period2=${period2}&interval=1d`;
-                const divUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?period1=${period1}&period2=${period2}&interval=1d&events=div`;
-                
-                loadingDiv.textContent = `Fetching ${ticker} data from ${startDate} to ${endDate}...`;
-                
-                const [priceRes, divRes] = await Promise.all([
-                    smartFetch(priceUrl),
-                    smartFetch(divUrl)
-                ]);
-                
-                loadingDiv.style.display = 'none';
-                analyzeBtn.disabled = false;
-                
-                const priceData = await priceRes.json();
-                const divData = await divRes.json();
-                
-                if (!priceData.chart || !priceData.chart.result || priceData.chart.result.length === 0) {
-                    throw new Error(`No price data found for ticker: ${ticker}. Verify the symbol exists on Yahoo Finance.`);
-                }
-                
-                const result = priceData.chart.result[0];
-                const indicators = result.indicators;
-                const timestamps = result.timestamp;
-                const quotes = indicators.quote[0];
-                
-                // Extract weekly price data
-                const weeklyPrices = [];
-                for (let i = 0; i < timestamps.length; i += 7) {
-                    if (quotes.close && quotes.close[i]) {
-                        weeklyPrices.push(quotes.close[i]);
-                    }
-                }
-                if (weeklyPrices.length < 2) {
-                    throw new Error(`Not enough weekly data points. Found ${weeklyPrices.length} weeks. Try a longer date range (at least 3 months).`);
-                }
-                
-                // Calculate NAV decay rate
-                const navChanges = [];
-                for (let i = 1; i < weeklyPrices.length; i++) {
-                    const change = (weeklyPrices[i-1] - weeklyPrices[i]) / weeklyPrices[i-1];
-                    navChanges.push(change);
-                }
-                const avgNavDecay = navChanges.reduce((a, b) => a + b, 0) / navChanges.length;
-                
-                // Extract distribution data
-                let totalDividends = 0;
-                let dividendCount = 0;
-                let avgDistRate = 0;
-                let distDecay = 0;
+	<div class="chart-container">
+		<canvas id="chart"></canvas>
+	</div>
 
-				if (divData.chart?.result?.[0]?.events?.dividends) {
-					const dividends = Object.values(divData.chart.result[0].events.dividends);
-					const prices = result.indicators.quote[0].close, times = result.timestamp;
+	<div class="summary">
+		<div class="summary-box">
+			<h3 id="etf1-summary-title">ETF 1 Total Distributions</h3>
+			<div class="summary-value" id="etf1-total-dist">$0.00</div>
+			<div class="summary-label">Reinvesting not included</div>
+			<div style="margin-top: 10px;">
+				<div class="summary-label">Final Value (No DRIP)</div>
+				<div class="summary-value" id="etf1-final-value" style="font-size: 18px; color: #555;">$0.00</div>
+			</div>
+			<div style="margin-top: 10px;">
+				<div class="summary-label">Total Return</div>
+				<div class="summary-value" id="etf1-total-return" style="font-size: 20px; color: #28a745;">$0.00</div>
+			</div>
+			<div style="margin-top: 10px;">
+				<div class="summary-label">DRIP Final Value</div>
+				<div class="summary-value" id="etf1-drip-value" style="font-size: 18px; color: #dc3545;">$0.00</div>
+			</div>
+		</div>
 
-					// avgDistRate = average(dividend / priceAtDate)
-					const rates = dividends.map(d => {
-						const idx = times.reduce((best, t, i) => Math.abs(t - d.date) < Math.abs(times[best] - d.date) ? i : best, 0);
-						return prices[idx] > 0 ? d.amount / prices[idx] : 0;
-					});
-					totalDividends = dividends.reduce((s, d) => s + d.amount, 0);
-					dividendCount = dividends.length;
-					avgDistRate = rates.reduce((s, r) => s + r, 0) / (rates.length || 1);
+		<div class="summary-box">
+			<h3 id="etf2-summary-title">ETF 2 Total Distributions</h3>
+			<div class="summary-value" id="etf2-total-dist">$0.00</div>
+			<div class="summary-label">Reinvesting not included</div>
+			<div style="margin-top: 10px;">
+				<div class="summary-label">Final Value (No DRIP)</div>
+				<div class="summary-value" id="etf2-final-value" style="font-size: 18px; color: #555;">$0.00</div>
+			</div>
+			<div style="margin-top: 10px;">
+				<div class="summary-label">Total Return</div>
+				<div class="summary-value" id="etf2-total-return" style="font-size: 20px; color: #28a745;">$0.00</div>
+			</div>
+			<div style="margin-top: 10px;">
+				<div class="summary-label">DRIP Final Value</div>
+				<div class="summary-value" id="etf2-drip-value" style="font-size: 18px; color: #dc3545;">$0.00</div>
+			</div>
+		</div>
+	</div>
 
-					// distDecay = average(periodDecay / weeksBetween)
-					if (dividends.length >= 2) {
-						const decays = [];
-						for (let i = 1; i < dividends.length; i++) {
-							const p = dividends[i-1].amount, c = dividends[i].amount, t = (dividends[i].date-dividends[i-1].date)/604800;
-							if (p>0 && t>0) decays.push(((p-c)/p)/t);
+	<div class="delta-comparison" id="delta-comparison">
+		<h3 style="text-align: center; margin-bottom: 15px;" id="comparison-title">ETF 1 vs ETF 2 Comparison</h3>
+		<div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;">
+			<div style="text-align: center;">
+				<div class="summary-label">Total Distributions</div>
+				<div class="summary-value" id="delta-distributions">0%</div>
+			</div>
+			<div style="text-align: center;">
+				<div class="summary-label">Final Value (No DRIP)</div>
+				<div class="summary-value" id="delta-final-value">0%</div>
+			</div>
+			<div style="text-align: center;">
+				<div class="summary-label">DRIP Final Value</div>
+				<div class="summary-value" id="delta-drip-value">0%</div>
+			</div>
+		</div>
+	</div>
+
+	<div class="url-share">
+		<button onclick="shareSimulation()">Copy Share URL</button>
+		<div id="url-status" style="margin-top: 10px; font-size: 14px; color: #28a745;"></div>
+	</div>
+</div>
+
+<script>
+	// Initialize chart
+	const ctx = document.getElementById('chart').getContext('2d');
+	const chart = new Chart(ctx, {
+		type: 'line',
+		data: {
+			labels: [],
+			datasets: []
+		},
+		options: {
+			responsive: true,
+			maintainAspectRatio: false,
+			animation: false,
+			interaction: {
+				mode: 'index',
+				intersect: false,
+			},
+			plugins: {
+				legend: {
+					position: 'top',
+				},
+				title: {
+					display: true,
+					text: 'ETF Performance Comparison'
+				},
+				tooltip: {
+					callbacks: {
+						label: function (context) {
+							return context.dataset.label + ': $' + context.parsed.y.toFixed(2);
 						}
-						distDecay = decays.reduce((s, d) => s + d, 0) / (decays.length || 1);
 					}
 				}
-                
-                // Store results
-                analyzedTicker = ticker;
-                analysisResults = {
-                    navDecay: avgNavDecay,
-                    distRate: avgDistRate,
-                    distDecay: distDecay,
-                    weeks: weeklyPrices.length - 1,
-                    startPrice: weeklyPrices[0],
-                    endPrice: weeklyPrices[weeklyPrices.length - 1],
-                    dividendCount: dividendCount,
-                    totalDividends: totalDividends
-                };
-                
-                // Show analysis results
-                const resultsHtml = `
+			},
+			scales: {
+				x: {
+					display: true,
+					title: {
+						display: true,
+						text: 'Weeks'
+					}
+				},
+				y: {
+					display: true,
+					title: {
+						display: true,
+						text: 'Value ($)'
+					}
+				}
+			}
+		}
+	});
+
+	// Colors
+	const colors = {
+		etf1: {
+			nav: 'rgb(54, 162, 235)',
+			dist: 'rgba(54, 162, 235, 0.5)',
+			drip: 'rgb(54, 162, 235)'
+		},
+		etf2: {
+			nav: 'rgb(255, 99, 132)',
+			dist: 'rgba(255, 99, 132, 0.5)',
+			drip: 'rgb(255, 99, 132)'
+		}
+	};
+
+	// Proxy configuration
+	const PROXY_ENDPOINTS = [
+		{
+			name: 'AllOrigins',
+			url: (target) => `https://api.allorigins.win/raw?url=${encodeURIComponent(target)}`,
+			method: 'fetch'
+		},
+		{
+			name: 'CORS Proxy',
+			url: (target) => `https://corsproxy.io/?${encodeURIComponent(target)}`,
+			method: 'fetch'
+		},
+		{
+			name: 'JSONP Fetch',
+			url: (target) => `${target}&callback=?`,
+			method: 'jsonp'
+		}
+	];
+
+	let currentProxyIndex = 0;
+	let analysisResults = null;
+	let etfNames = {etf1: 'ETF 1', etf2: 'ETF 2'};
+	let analyzedTicker = null;
+	let etf1Interval = 1;
+	let etf2Interval = 1;
+	let etf1PeriodUnit = 'week';
+	let etf2PeriodUnit = 'week';
+	let etf1Frequency = 'weekly';
+	let etf2Frequency = 'weekly';
+
+	// Utility functions
+	function debounce(func, wait) {
+		let timeout;
+		return function executedFunction(...args) {
+			const later = () => {
+				clearTimeout(timeout);
+				func(...args);
+			};
+			clearTimeout(timeout);
+			timeout = setTimeout(later, wait);
+		};
+	}
+
+	// JSONP fetch function
+	function jsonpFetch(url) {
+		return new Promise((resolve, reject) => {
+			const callbackName = 'jsonp_callback_' + Math.round(100000 * Math.random());
+			const script = document.createElement('script');
+
+			window[callbackName] = function (data) {
+				delete window[callbackName];
+				document.body.removeChild(script);
+				resolve({ok: true, json: () => Promise.resolve(data)});
+			};
+
+			script.src = url.replace('callback=?', `callback=${callbackName}`);
+			script.onerror = () => {
+				delete window[callbackName];
+				document.body.removeChild(script);
+				reject(new Error('JSONP failed'));
+			};
+
+			document.body.appendChild(script);
+		});
+	}
+
+	// Smart fetch with proxy rotation
+	async function smartFetch(url) {
+		const endpoint = PROXY_ENDPOINTS[currentProxyIndex];
+		console.log(`Trying ${endpoint.name}...`);
+
+		document.getElementById('proxy-status').textContent = `Using proxy: ${endpoint.name}`;
+
+		try {
+			if (endpoint.method === 'jsonp') {
+				return await jsonpFetch(url);
+			} else {
+				const proxiedUrl = endpoint.url(url);
+				const response = await fetch(proxiedUrl);
+				if (!response.ok) throw new Error(`HTTP ${response.status}`);
+				return response;
+			}
+		} catch (error) {
+			currentProxyIndex = (currentProxyIndex + 1) % PROXY_ENDPOINTS.length;
+			if (currentProxyIndex === 0) {
+				throw new Error('All proxies failed');
+			}
+			return smartFetch(url);
+		}
+	}
+
+	// Main calculation function
+	function calculate() {
+		const weeks = parseInt(document.getElementById('timeframe').value) || 52;
+		const initialInvestment = parseFloat(document.getElementById('initial-investment').value) || 10000;
+
+		// Get ETF1 values
+		const etf1 = {
+			navDecay: parseFloat(document.getElementById('etf1-nav-decay').value) / 100 || 0,
+			distRate: parseFloat(document.getElementById('etf1-dist-rate').value) / 100 || 0,
+			distDecay: parseFloat(document.getElementById('etf1-dist-decay').value) / 100 || 0,
+			decoupled: document.getElementById('etf1-decouple').checked,
+			absDist: parseFloat(document.getElementById('etf1-abs-dist').value) / 100 || 0
+		};
+
+		// Get ETF2 values
+		const etf2 = {
+			navDecay: parseFloat(document.getElementById('etf2-nav-decay').value) / 100 || 0,
+			distRate: parseFloat(document.getElementById('etf2-dist-rate').value) / 100 || 0,
+			distDecay: parseFloat(document.getElementById('etf2-dist-decay').value) / 100 || 0,
+			decoupled: document.getElementById('etf2-decouple').checked,
+			absDist: parseFloat(document.getElementById('etf2-abs-dist').value) / 100 || 0
+		};
+
+		// Generate data
+		const labels = [];
+		const etf1Value = [];
+		const etf1CumDist = [];
+		const etf1Drip = [];
+		const etf2Value = [];
+		const etf2CumDist = [];
+		const etf2Drip = [];
+
+		// ETF1 calculations
+		let value1 = initialInvestment;
+		let cumDist1 = 0;
+		let shares1 = 1;
+		let dripValue1 = initialInvestment;
+
+		// ETF2 calculations
+		let value2 = initialInvestment;
+		let cumDist2 = 0;
+		let shares2 = 1;
+		let dripValue2 = initialInvestment;
+
+		for (let w = 0; w <= weeks; w++) {
+			labels.push(w);
+
+			// Store current value
+			etf1Value.push(value1);
+			etf2Value.push(value2);
+
+			etf1CumDist.push(cumDist1);
+			etf2CumDist.push(cumDist2);
+
+			etf1Drip.push(dripValue1);
+			etf2Drip.push(dripValue2);
+
+			// Calculate distributions for this week if applicable
+			let dist1 = 0;
+			if (w > 0 && (w % etf1Interval === 0)) {
+				const currentDistRate = etf1.distRate * Math.pow(1 - etf1.distDecay, w);
+				if (etf1.decoupled) {
+					const currentAbsDist = etf1.absDist * Math.pow(1 - etf1.distDecay, w);
+					dist1 = currentAbsDist * initialInvestment;
+				} else {
+					dist1 = value1 * currentDistRate;
+				}
+			}
+
+			let dist2 = 0;
+			if (w > 0 && (w % etf2Interval === 0)) {
+				const currentDistRate = etf2.distRate * Math.pow(1 - etf2.distDecay, w);
+				if (etf2.decoupled) {
+					const currentAbsDist = etf2.absDist * Math.pow(1 - etf2.distDecay, w);
+					dist2 = currentAbsDist * initialInvestment;
+				} else {
+					dist2 = value2 * currentDistRate;
+				}
+			}
+
+			// Update cumulative distributions
+			cumDist1 += dist1;
+			cumDist2 += dist2;
+
+			// DRIP calculations
+			shares1 += dist1 / value1;
+			shares2 += dist2 / value2;
+
+			dripValue1 = shares1 * value1;
+			dripValue2 = shares2 * value2;
+
+			// Update value for next week
+			value1 *= (1 - etf1.navDecay);
+			value2 *= (1 - etf2.navDecay);
+		}
+
+		// Update summary
+		document.getElementById('etf1-total-dist').textContent = '$' + cumDist1.toFixed(2);
+		document.getElementById('etf1-final-value').textContent = '$' + etf1Value[etf1Value.length - 1].toFixed(2);
+		document.getElementById('etf1-total-return').textContent = '$' + (etf1Value[etf1Value.length - 1] + cumDist1).toFixed(2);
+		document.getElementById('etf1-drip-value').textContent = '$' + dripValue1.toFixed(2);
+
+		document.getElementById('etf2-total-dist').textContent = '$' + cumDist2.toFixed(2);
+		document.getElementById('etf2-final-value').textContent = '$' + etf2Value[etf2Value.length - 1].toFixed(2);
+		document.getElementById('etf2-total-return').textContent = '$' + (etf2Value[etf2Value.length - 1] + cumDist2).toFixed(2);
+		document.getElementById('etf2-drip-value').textContent = '$' + dripValue2.toFixed(2);
+
+		// Update delta comparison
+		const deltaDist = ((cumDist1 / cumDist2) * 100).toFixed(1);
+		const deltaFinalValue = ((etf1Value[etf1Value.length - 1] / etf2Value[etf2Value.length - 1]) * 100).toFixed(1);
+		const deltaDripValue = ((dripValue1 / dripValue2) * 100).toFixed(1);
+
+		document.getElementById('delta-distributions').textContent = deltaDist + '%';
+		document.getElementById('delta-final-value').textContent = deltaFinalValue + '%';
+		document.getElementById('delta-drip-value').textContent = deltaDripValue + '%';
+
+		// Color code deltas
+		const deltaElements = ['delta-distributions', 'delta-final-value', 'delta-drip-value'];
+		deltaElements.forEach(id => {
+			const element = document.getElementById(id);
+			const value = parseFloat(element.textContent);
+			element.parentElement.className = value > 100 ? 'delta-positive' : 'delta-negative';
+		});
+
+		// Update chart
+		chart.data.labels = labels;
+		chart.data.datasets = [
+			{
+				label: `${etfNames.etf1} Value`,
+				data: etf1Value,
+				borderColor: colors.etf1.nav,
+				backgroundColor: 'transparent',
+				borderWidth: 2,
+				borderDash: [5, 5],
+				pointRadius: 0,
+				yAxisID: 'y',
+			},
+			{
+				label: `${etfNames.etf1} Distributions`,
+				data: etf1CumDist,
+				borderColor: colors.etf1.dist,
+				backgroundColor: colors.etf1.dist,
+				fill: true,
+				tension: 0.1,
+				pointRadius: 0,
+				yAxisID: 'y',
+			},
+			{
+				label: `${etfNames.etf1} DRIP`,
+				data: etf1Drip,
+				borderColor: colors.etf1.drip,
+				backgroundColor: 'transparent',
+				pointHoverRadius: 6,
+				borderWidth: 2,
+				pointRadius: 0,
+				yAxisID: 'y',
+			},
+			{
+				label: `${etfNames.etf2} Value`,
+				data: etf2Value,
+				borderColor: colors.etf2.nav,
+				backgroundColor: 'transparent',
+				borderWidth: 2,
+				borderDash: [5, 5],
+				pointRadius: 0,
+				yAxisID: 'y',
+			},
+			{
+				label: `${etfNames.etf2} Distributions`,
+				data: etf2CumDist,
+				borderColor: colors.etf2.dist,
+				backgroundColor: colors.etf2.dist,
+				fill: true,
+				tension: 0.1,
+				pointRadius: 0,
+				yAxisID: 'y',
+			},
+			{
+				label: `${etfNames.etf2} DRIP`,
+				data: etf2Drip,
+				borderColor: colors.etf2.drip,
+				backgroundColor: 'transparent',
+				pointHoverRadius: 6,
+				borderWidth: 2,
+				pointRadius: 0,
+				yAxisID: 'y',
+			}
+		];
+
+		chart.update('none');
+		updateURL();
+	}
+
+	// Apply analysis results to ETF
+	function applyToETF(etfNumber) {
+		if (!analysisResults || !analyzedTicker) return;
+		// Update the actual input fields with analysis results
+		if (etfNumber === 1) {
+			document.getElementById('etf1-nav-decay').value = (analysisResults.navDecay * 100).toFixed(3);
+			document.getElementById('etf1-dist-rate').value = (analysisResults.distRate * 100).toFixed(3);
+			document.getElementById('etf1-dist-decay').value = (analysisResults.distDecay * 100).toFixed(3);
+			etfNames.etf1 = analyzedTicker;
+			document.getElementById('etf1-title').textContent = analyzedTicker;
+			document.getElementById('etf1-summary-title').textContent = `${analyzedTicker} Total Distributions`;
+			etf1Interval = analysisResults.interval_weeks;
+			etf1PeriodUnit = analysisResults.period_unit;
+			etf1Frequency = analysisResults.frequency;
+			document.querySelector('#etf1-dist-rate-group label').textContent = `Distribution Rate (%/${etf1PeriodUnit})`;
+			document.querySelector('#etf1-abs-dist-group label').textContent = `Absolute Distribution (%/${etf1PeriodUnit})`;
+		} else if (etfNumber === 2) {
+			document.getElementById('etf2-nav-decay').value = (analysisResults.navDecay * 100).toFixed(3);
+			document.getElementById('etf2-dist-rate').value = (analysisResults.distRate * 100).toFixed(3);
+			document.getElementById('etf2-dist-decay').value = (analysisResults.distDecay * 100).toFixed(3);
+			etfNames.etf2 = analyzedTicker;
+			document.getElementById('etf2-title').textContent = analyzedTicker;
+			document.getElementById('etf2-summary-title').textContent = `${analyzedTicker} Total Distributions`;
+			etf2Interval = analysisResults.interval_weeks;
+			etf2PeriodUnit = analysisResults.period_unit;
+			etf2Frequency = analysisResults.frequency;
+			document.querySelector('#etf2-dist-rate-group label').textContent = `Distribution Rate (%/${etf2PeriodUnit})`;
+			document.querySelector('#etf2-abs-dist-group label').textContent = `Absolute Distribution (%/${etf2PeriodUnit})`;
+		}
+		document.getElementById('comparison-title').textContent = `${etfNames.etf1} vs ${etfNames.etf2} Comparison`;
+		// Disable apply buttons after applying
+		document.getElementById('apply-etf1-btn').disabled = true;
+		document.getElementById('apply-etf2-btn').disabled = true;
+		analysisResults = null;
+		analyzedTicker = null;
+		calculate(); // Recalculate with new values
+	}
+
+	// Set ticker and load data
+	function setTickerAndLoad(ticker) {
+		document.getElementById('ticker').value = ticker;
+	}
+
+	// Yahoo Finance analysis with smart proxy rotation
+	async function analyzeTicker() {
+		const ticker = document.getElementById('ticker').value.toUpperCase();
+		const startDate = document.getElementById('start-date').value;
+		const endDate = document.getElementById('end-date').value;
+		const errorDiv = document.getElementById('ticker-error');
+		const infoDiv = document.getElementById('ticker-info');
+		const successDiv = document.getElementById('ticker-success');
+		const loadingDiv = document.getElementById('ticker-loading');
+		const analyzeBtn = document.getElementById('analyze-btn');
+		const applyBtn1 = document.getElementById('apply-etf1-btn');
+		const applyBtn2 = document.getElementById('apply-etf2-btn');
+
+		errorDiv.textContent = '';
+		successDiv.textContent = '';
+		loadingDiv.style.display = 'block';
+		analyzeBtn.disabled = true;
+		applyBtn1.disabled = true;
+		applyBtn2.disabled = true;
+
+		if (!ticker || !startDate || !endDate) {
+			errorDiv.textContent = 'Please fill all fields';
+			loadingDiv.style.display = 'none';
+			analyzeBtn.disabled = false;
+			return;
+		}
+
+		try {
+			const period1 = Math.floor(new Date(startDate).getTime() / 1000);
+			const period2 = Math.floor(new Date(endDate).getTime() / 1000);
+
+			const priceUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?period1=${period1}&period2=${period2}&interval=1d`;
+			const divUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?period1=${period1}&period2=${period2}&interval=1d&events=div`;
+
+			loadingDiv.textContent = `Fetching ${ticker} data from ${startDate} to ${endDate}...`;
+
+			const [priceRes, divRes] = await Promise.all([
+				smartFetch(priceUrl),
+				smartFetch(divUrl)
+			]);
+
+			loadingDiv.style.display = 'none';
+			analyzeBtn.disabled = false;
+
+			const priceData = await priceRes.json();
+			const divData = await divRes.json();
+
+			if (!priceData.chart || !priceData.chart.result || priceData.chart.result.length === 0) {
+				throw new Error(`No price data found for ticker: ${ticker}. Verify the symbol exists on Yahoo Finance.`);
+			}
+
+			const result = priceData.chart.result[0];
+			const indicators = result.indicators;
+			const timestamps = result.timestamp;
+			const quotes = indicators.quote[0];
+
+			// Extract weekly price data
+			const weeklyPrices = [];
+			for (let i = 0; i < timestamps.length; i += 7) {
+				if (quotes.close && quotes.close[i]) {
+					weeklyPrices.push(quotes.close[i]);
+				}
+			}
+			if (weeklyPrices.length < 2) {
+				throw new Error(`Not enough weekly data points. Found ${weeklyPrices.length} weeks. Try a longer date range (at least 3 months).`);
+			}
+
+			// Calculate NAV decay rate
+			const navChanges = [];
+			for (let i = 1; i < weeklyPrices.length; i++) {
+				const change = (weeklyPrices[i - 1] - weeklyPrices[i]) / weeklyPrices[i - 1];
+				navChanges.push(change);
+			}
+			const avgNavDecay = navChanges.reduce((a, b) => a + b, 0) / navChanges.length;
+
+			// Extract distribution data
+			let totalDividends = 0;
+			let dividendCount = 0;
+			let avgDistRate = 0;
+			let distDecay = 0;
+			let frequency = 'no distributions detected';
+			let period_unit = 'period';
+			let interval_weeks = 1;
+			let avg_days = 0;
+			if (divData.chart?.result?.[0]?.events?.dividends) {
+				const dividends = Object.values(divData.chart.result[0].events.dividends).sort((a, b) => a.date - b.date);
+				const prices = result.indicators.quote[0].close, times = result.timestamp;
+				// avgDistRate = average(dividend / priceAtDate)
+				const rates = dividends.map(d => {
+					const idx = times.reduce((best, t, i) => Math.abs(t - d.date) < Math.abs(times[best] - d.date) ? i : best, 0);
+					return prices[idx] > 0 ? d.amount / prices[idx] : 0;
+				}).filter(r => r > 0);
+				totalDividends = dividends.reduce((s, d) => s + d.amount, 0);
+				dividendCount = dividends.length;
+				avgDistRate = rates.reduce((s, r) => s + r, 0) / (rates.length || 1);
+				// distDecay = average(periodDecay / weeksBetween)
+				const decays = [];
+				const intervals = [];
+				for (let i = 1; i < dividends.length; i++) {
+					const p = dividends[i - 1].amount, c = dividends[i].amount, diff = dividends[i].date - dividends[i - 1].date;
+					const t = diff / 604800;
+					const days_between = diff / 86400;
+					if (p > 0 && t > 0) decays.push(((p - c) / p) / t);
+					intervals.push(days_between);
+				}
+				distDecay = decays.reduce((s, d) => s + d, 0) / (decays.length || 1);
+				if (intervals.length > 0) {
+					avg_days = intervals.reduce((s, i) => s + i, 0) / intervals.length;
+					interval_weeks = Math.round(avg_days / 7);
+					const frequencyMap = [
+						{min: 6, max: 8, name: 'WEEKLY', unit: 'week', weeks: 1},
+						{min: 13, max: 15, name: 'BIWEEKLY', unit: 'biweek', weeks: 2},
+						{min: 28, max: 32, name: 'MONTHLY', unit: 'month', weeks: 4},
+						{min: 58, max: 62, name: 'BIMONTHLY', unit: 'bimonth', weeks: 9},
+						{min: 88, max: 93, name: 'QUARTERLY', unit: 'quarter', weeks: 13},
+						{min: 360, max: 370, name: 'YEARLY', unit: 'year', weeks: 52}
+					];
+					frequency = `approximately every ${avg_days.toFixed(0)} days`;
+					period_unit = 'period';
+					for (let m of frequencyMap) {
+						if (avg_days >= m.min && avg_days <= m.max) {
+							frequency = m.name;
+							period_unit = m.unit;
+							break;
+						}
+					}
+				} else if (dividendCount === 1) {
+					frequency = 'unknown (only one dividend)';
+				} else {
+					frequency = 'no distributions detected';
+				}
+			}
+
+			// Store results
+			analyzedTicker = ticker;
+			analysisResults = {
+				navDecay: avgNavDecay,
+				distRate: avgDistRate,
+				distDecay: distDecay,
+				weeks: weeklyPrices.length - 1,
+				startPrice: weeklyPrices[0],
+				endPrice: weeklyPrices[weeklyPrices.length - 1],
+				dividendCount: dividendCount,
+				totalDividends: totalDividends,
+				frequency: frequency,
+				period_unit: period_unit,
+				interval_weeks: interval_weeks
+			};
+
+			// Show analysis results
+			const resultsHtml = `
                     <div class="analysis-results">
-                        <h4>${ticker} Analysis Results</h4>
+                        <h4>${ticker} <span class="frequency-badge">${frequency}</span></h4>
                         <div class="metric">
                             <span class="metric-name">Date Range:</span>
                             <span class="metric-value">${startDate} to ${endDate}</span>
@@ -1050,7 +1109,7 @@
                         </div>
                         <div class="metric">
                             <span class="metric-name">Distribution Rate:</span>
-                            <span class="metric-value">${(avgDistRate * 100).toFixed(3)}%/week</span>
+                            <span class="metric-value">${(avgDistRate * 100).toFixed(3)}%/${period_unit}</span>
                         </div>
                         <div class="metric">
                             <span class="metric-name">Distribution Decay:</span>
@@ -1064,157 +1123,169 @@
                         ` : ''}
                     </div>
                 `;
-                
-                infoDiv.innerHTML = resultsHtml;
-                infoDiv.style.display = 'block';
-                
-                // Enable apply buttons
-                applyBtn1.disabled = false;
-                applyBtn2.disabled = false;
-                
-            } catch (error) {
-                loadingDiv.style.display = 'none';
-                analyzeBtn.disabled = false;
-                errorDiv.textContent = 'Error: ' + error.message;
-                
-                if (currentProxyIndex < PROXY_ENDPOINTS.length - 1) {
-                    infoDiv.textContent = `Proxy failed. Click "Retry with Backup Proxy" to try ${PROXY_ENDPOINTS[currentProxyIndex + 1].name}.`;
-                    infoDiv.style.display = 'block';
-                } else {
-                    infoDiv.textContent = 'All proxies failed. Try again later.';
-                    infoDiv.style.display = 'block';
-                }
-                
-                console.error(error);
-            }
-        }
-        
-        // Event listeners
-        const debouncedCalculate = debounce(calculate, 100);
-        
-        document.getElementById('timeframe').addEventListener('input', debouncedCalculate);
-        document.getElementById('initial-investment').addEventListener('input', debouncedCalculate);
-        
-        // ETF1 listeners
-        document.getElementById('etf1-nav-decay').addEventListener('input', debouncedCalculate);
-        document.getElementById('etf1-dist-rate').addEventListener('input', debouncedCalculate);
-        document.getElementById('etf1-dist-decay').addEventListener('input', debouncedCalculate);
-        document.getElementById('etf1-decouple').addEventListener('change', function() {
-            const absGroup = document.getElementById('etf1-abs-dist-group');
-            const rateGroup = document.getElementById('etf1-dist-rate-group');
-            if (this.checked) {
-                absGroup.classList.remove('hidden');
-                rateGroup.style.display = 'none';
-            } else {
-                absGroup.classList.add('hidden');
-                rateGroup.style.display = 'block';
-            }
-            debouncedCalculate();
-        });
-        document.getElementById('etf1-abs-dist').addEventListener('input', debouncedCalculate);
-        
-        // ETF2 listeners
-        document.getElementById('etf2-nav-decay').addEventListener('input', debouncedCalculate);
-        document.getElementById('etf2-dist-rate').addEventListener('input', debouncedCalculate);
-        document.getElementById('etf2-dist-decay').addEventListener('input', debouncedCalculate);
-        document.getElementById('etf2-decouple').addEventListener('change', function() {
-            const absGroup = document.getElementById('etf2-abs-dist-group');
-            const rateGroup = document.getElementById('etf2-dist-rate-group');
-            if (this.checked) {
-                absGroup.classList.remove('hidden');
-                rateGroup.style.display = 'none';
-            } else {
-                absGroup.classList.add('hidden');
-                rateGroup.style.display = 'block';
-            }
-            debouncedCalculate();
-        });
-        document.getElementById('etf2-abs-dist').addEventListener('input', debouncedCalculate);
-        
-        // Set default dates
-        const today = new Date();
-        const sixMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 6, today.getDate());
-        document.getElementById('start-date').value = sixMonthsAgo.toISOString().split('T')[0];
-        document.getElementById('end-date').value = today.toISOString().split('T')[0];
-        
-        // URL handling
-        function updateURL() {
-            const params = new URLSearchParams();
-            
-            params.set('weeks', document.getElementById('timeframe').value);
-            params.set('investment', document.getElementById('initial-investment').value);
-            params.set('etf1-nav-decay', document.getElementById('etf1-nav-decay').value);
-            params.set('etf1-dist-rate', document.getElementById('etf1-dist-rate').value);
-            params.set('etf1-dist-decay', document.getElementById('etf1-dist-decay').value);
-            params.set('etf1-decouple', document.getElementById('etf1-decouple').checked);
-            params.set('etf1-abs-dist', document.getElementById('etf1-abs-dist').value);
-            
-            params.set('etf2-nav-decay', document.getElementById('etf2-nav-decay').value);
-            params.set('etf2-dist-rate', document.getElementById('etf2-dist-rate').value);
-            params.set('etf2-dist-decay', document.getElementById('etf2-dist-decay').value);
-            params.set('etf2-decouple', document.getElementById('etf2-decouple').checked);
-            params.set('etf2-abs-dist', document.getElementById('etf2-abs-dist').value);
 
-            params.set('etf1-name', etfNames.etf1);
-            params.set('etf2-name', etfNames.etf2);
-            
-            const newUrl = window.location.pathname + '?' + params.toString();
-            window.history.replaceState({}, '', newUrl);
-        }
-        
-        function loadFromURL() {
-            const params = new URLSearchParams(window.location.search);
-            
-            if (params.toString() === '') return;
-            
-            if (params.has('weeks')) document.getElementById('timeframe').value = params.get('weeks');
-            if (params.has('investment')) document.getElementById('initial-investment').value = params.get('investment');
-            if (params.has('etf1-nav-decay')) document.getElementById('etf1-nav-decay').value = params.get('etf1-nav-decay');
-            if (params.has('etf1-dist-rate')) document.getElementById('etf1-dist-rate').value = params.get('etf1-dist-rate');
-            if (params.has('etf1-dist-decay')) document.getElementById('etf1-dist-decay').value = params.get('etf1-dist-decay');
-            if (params.has('etf1-decouple')) document.getElementById('etf1-decouple').checked = params.get('etf1-decouple') === 'true';
-            if (params.has('etf1-abs-dist')) document.getElementById('etf1-abs-dist').value = params.get('etf1-abs-dist');
-            
-            if (params.has('etf2-nav-decay')) document.getElementById('etf2-nav-decay').value = params.get('etf2-nav-decay');
-            if (params.has('etf2-dist-rate')) document.getElementById('etf2-dist-rate').value = params.get('etf2-dist-rate');
-            if (params.has('etf2-dist-decay')) document.getElementById('etf2-dist-decay').value = params.get('etf2-dist-decay');
-            if (params.has('etf2-decouple')) document.getElementById('etf2-decouple').checked = params.get('etf2-decouple') === 'true';
-            if (params.has('etf2-abs-dist')) document.getElementById('etf2-abs-dist').value = params.get('etf2-abs-dist');
+			infoDiv.innerHTML = resultsHtml;
+			infoDiv.style.display = 'block';
 
-              // Load ETF names
-            if (params.has('etf1-name')) {
-                etfNames.etf1 = params.get('etf1-name');
-                document.getElementById('etf1-title').textContent = etfNames.etf1;
-                document.getElementById('etf1-summary-title').textContent = `${etfNames.etf1} Total Distributions`;
-            }
-            if (params.has('etf2-name')) {
-                etfNames.etf2 = params.get('etf2-name');
-                document.getElementById('etf2-title').textContent = etfNames.etf2;
-                document.getElementById('etf2-summary-title').textContent = `${etfNames.etf2} Total Distributions`;
-            }
-            
-            document.getElementById('etf1-decouple').dispatchEvent(new Event('change'));
-            document.getElementById('etf2-decouple').dispatchEvent(new Event('change'));
+			// Enable apply buttons
+			applyBtn1.disabled = false;
+			applyBtn2.disabled = false;
 
-            // Update comparison title
-            document.getElementById('comparison-title').textContent = `${etfNames.etf1} vs ${etfNames.etf2} Comparison`;
-        }
-        
-        function shareSimulation() {
-            const url = window.location.href;
-            navigator.clipboard.writeText(url).then(() => {
-                document.getElementById('url-status').textContent = 'URL copied to clipboard!';
-                setTimeout(() => {
-                    document.getElementById('url-status').textContent = '';
-                }, 3000);
-            }).catch(() => {
-                document.getElementById('url-status').textContent = 'Failed to copy. Please copy manually.';
-            });
-        }
-        
-        // Initial load
-        loadFromURL();
-        calculate();
-    </script>
+		} catch (error) {
+			loadingDiv.style.display = 'none';
+			analyzeBtn.disabled = false;
+			errorDiv.textContent = 'Error: ' + error.message;
+
+			if (currentProxyIndex < PROXY_ENDPOINTS.length - 1) {
+				infoDiv.textContent = `Proxy failed. Click "Retry with Backup Proxy" to try ${PROXY_ENDPOINTS[currentProxyIndex + 1].name}.`;
+				infoDiv.style.display = 'block';
+			} else {
+				infoDiv.textContent = 'All proxies failed. Try again later.';
+				infoDiv.style.display = 'block';
+			}
+
+			console.error(error);
+		}
+	}
+
+	// Event listeners
+	const debouncedCalculate = debounce(calculate, 100);
+
+	document.getElementById('timeframe').addEventListener('input', debouncedCalculate);
+	document.getElementById('initial-investment').addEventListener('input', debouncedCalculate);
+
+	// ETF1 listeners
+	document.getElementById('etf1-nav-decay').addEventListener('input', debouncedCalculate);
+	document.getElementById('etf1-dist-rate').addEventListener('input', debouncedCalculate);
+	document.getElementById('etf1-dist-decay').addEventListener('input', debouncedCalculate);
+	document.getElementById('etf1-decouple').addEventListener('change', function () {
+		const absGroup = document.getElementById('etf1-abs-dist-group');
+		const rateGroup = document.getElementById('etf1-dist-rate-group');
+		if (this.checked) {
+			absGroup.classList.remove('hidden');
+			rateGroup.style.display = 'none';
+		} else {
+			absGroup.classList.add('hidden');
+			rateGroup.style.display = 'block';
+		}
+		debouncedCalculate();
+	});
+	document.getElementById('etf1-abs-dist').addEventListener('input', debouncedCalculate);
+
+	// ETF2 listeners
+	document.getElementById('etf2-nav-decay').addEventListener('input', debouncedCalculate);
+	document.getElementById('etf2-dist-rate').addEventListener('input', debouncedCalculate);
+	document.getElementById('etf2-dist-decay').addEventListener('input', debouncedCalculate);
+	document.getElementById('etf2-decouple').addEventListener('change', function () {
+		const absGroup = document.getElementById('etf2-abs-dist-group');
+		const rateGroup = document.getElementById('etf2-dist-rate-group');
+		if (this.checked) {
+			absGroup.classList.remove('hidden');
+			rateGroup.style.display = 'none';
+		} else {
+			absGroup.classList.add('hidden');
+			rateGroup.style.display = 'block';
+		}
+		debouncedCalculate();
+	});
+	document.getElementById('etf2-abs-dist').addEventListener('input', debouncedCalculate);
+
+	// Set default dates
+	const today = new Date();
+	const sixMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 6, today.getDate());
+	document.getElementById('start-date').value = sixMonthsAgo.toISOString().split('T')[0];
+	document.getElementById('end-date').value = today.toISOString().split('T')[0];
+
+	// URL handling
+	function updateURL() {
+		const params = new URLSearchParams();
+
+		params.set('weeks', document.getElementById('timeframe').value);
+		params.set('investment', document.getElementById('initial-investment').value);
+		params.set('etf1-nav-decay', document.getElementById('etf1-nav-decay').value);
+		params.set('etf1-dist-rate', document.getElementById('etf1-dist-rate').value);
+		params.set('etf1-dist-decay', document.getElementById('etf1-dist-decay').value);
+		params.set('etf1-decouple', document.getElementById('etf1-decouple').checked);
+		params.set('etf1-abs-dist', document.getElementById('etf1-abs-dist').value);
+		params.set('etf1-interval', etf1Interval);
+		params.set('etf1-unit', etf1PeriodUnit);
+
+		params.set('etf2-nav-decay', document.getElementById('etf2-nav-decay').value);
+		params.set('etf2-dist-rate', document.getElementById('etf2-dist-rate').value);
+		params.set('etf2-dist-decay', document.getElementById('etf2-dist-decay').value);
+		params.set('etf2-decouple', document.getElementById('etf2-decouple').checked);
+		params.set('etf2-abs-dist', document.getElementById('etf2-abs-dist').value);
+		params.set('etf2-interval', etf2Interval);
+		params.set('etf2-unit', etf2PeriodUnit);
+
+		params.set('etf1-name', etfNames.etf1);
+		params.set('etf2-name', etfNames.etf2);
+
+		const newUrl = window.location.pathname + '?' + params.toString();
+		window.history.replaceState({}, '', newUrl);
+	}
+
+	function loadFromURL() {
+		const params = new URLSearchParams(window.location.search);
+
+		if (params.toString() === '') return;
+
+		if (params.has('weeks')) document.getElementById('timeframe').value = params.get('weeks');
+		if (params.has('investment')) document.getElementById('initial-investment').value = params.get('investment');
+		if (params.has('etf1-nav-decay')) document.getElementById('etf1-nav-decay').value = params.get('etf1-nav-decay');
+		if (params.has('etf1-dist-rate')) document.getElementById('etf1-dist-rate').value = params.get('etf1-dist-rate');
+		if (params.has('etf1-dist-decay')) document.getElementById('etf1-dist-decay').value = params.get('etf1-dist-decay');
+		if (params.has('etf1-decouple')) document.getElementById('etf1-decouple').checked = params.get('etf1-decouple') === 'true';
+		if (params.has('etf1-abs-dist')) document.getElementById('etf1-abs-dist').value = params.get('etf1-abs-dist');
+		if (params.has('etf1-interval')) etf1Interval = parseInt(params.get('etf1-interval'));
+		if (params.has('etf1-unit')) etf1PeriodUnit = params.get('etf1-unit');
+
+		if (params.has('etf2-nav-decay')) document.getElementById('etf2-nav-decay').value = params.get('etf2-nav-decay');
+		if (params.has('etf2-dist-rate')) document.getElementById('etf2-dist-rate').value = params.get('etf2-dist-rate');
+		if (params.has('etf2-dist-decay')) document.getElementById('etf2-dist-decay').value = params.get('etf2-dist-decay');
+		if (params.has('etf2-decouple')) document.getElementById('etf2-decouple').checked = params.get('etf2-decouple') === 'true';
+		if (params.has('etf2-abs-dist')) document.getElementById('etf2-abs-dist').value = params.get('etf2-abs-dist');
+		if (params.has('etf2-interval')) etf2Interval = parseInt(params.get('etf2-interval'));
+		if (params.has('etf2-unit')) etf2PeriodUnit = params.get('etf2-unit');
+
+		// Load ETF names
+		if (params.has('etf1-name')) {
+			etfNames.etf1 = params.get('etf1-name');
+			document.getElementById('etf1-title').textContent = etfNames.etf1;
+			document.getElementById('etf1-summary-title').textContent = `${etfNames.etf1} Total Distributions`;
+		}
+		if (params.has('etf2-name')) {
+			etfNames.etf2 = params.get('etf2-name');
+			document.getElementById('etf2-title').textContent = etfNames.etf2;
+			document.getElementById('etf2-summary-title').textContent = `${etfNames.etf2} Total Distributions`;
+		}
+
+		document.getElementById('etf1-decouple').dispatchEvent(new Event('change'));
+		document.getElementById('etf2-decouple').dispatchEvent(new Event('change'));
+		// Update labels
+		document.querySelector('#etf1-dist-rate-group label').textContent = `Distribution Rate (%/${etf1PeriodUnit})`;
+		document.querySelector('#etf1-abs-dist-group label').textContent = `Absolute Distribution (%/${etf1PeriodUnit})`;
+		document.querySelector('#etf2-dist-rate-group label').textContent = `Distribution Rate (%/${etf2PeriodUnit})`;
+		document.querySelector('#etf2-abs-dist-group label').textContent = `Absolute Distribution (%/${etf2PeriodUnit})`;
+		// Update comparison title
+		document.getElementById('comparison-title').textContent = `${etfNames.etf1} vs ${etfNames.etf2} Comparison`;
+	}
+
+	function shareSimulation() {
+		const url = window.location.href;
+		navigator.clipboard.writeText(url).then(() => {
+			document.getElementById('url-status').textContent = 'URL copied to clipboard!';
+			setTimeout(() => {
+				document.getElementById('url-status').textContent = '';
+			}, 3000);
+		}).catch(() => {
+			document.getElementById('url-status').textContent = 'Failed to copy. Please copy manually.';
+		});
+	}
+
+	// Initial load
+	loadFromURL();
+	calculate();
+</script>
 </body>
 </html>
