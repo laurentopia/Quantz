@@ -977,10 +977,11 @@
                 // Extract distribution data
                 let totalDividends = 0;
                 let dividendCount = 0;
-                let avgDistRate = 0.0025;
+                let avgDistRate = 0.00;
                 let distDecay = 0.05;
                 
-                if (divData.chart && divData.chart.result && divData.chart.result[0].events && divData.chart.result[0].events.dividends) {
+                if (divData.chart && divData.chart.result && divData.chart.result[0].events && divData.chart.result[0].events.dividends) 
+                {
                     const dividends = Object.values(divData.chart.result[0].events.dividends);
                     totalDividends = dividends.reduce((sum, div) => sum + div.amount, 0);
                     dividendCount = dividends.length;
@@ -988,42 +989,27 @@
                     const avgPrice = weeklyPrices.reduce((a, b) => a + b, 0) / weeklyPrices.length;
                     const weeks = weeklyPrices.length - 1;
                     avgDistRate = (totalDividends / weeks) / avgPrice;
-                    
-                if (dividends.length >= 2) {
-                    let totalDistDecay = 0;
-                    let validDecays = 0;
-                    
-                    for (let i = 1; i < dividends.length; i++) {
-                        const prevAmount = dividends[i-1].amount;
-                        const currAmount = dividends[i].amount;
-                        const timeDiff = dividends[i].date - dividends[i-1].date;
-                        const weeksBetween = timeDiff / (7 * 24 * 60 * 60);
+
+                    //distribution decay
+                    if (dividends.length >= 2) {
+                        let totalDistDecay = 0;
+                        let validDecays = 0;
                         
-                        if (prevAmount > 0 && weeksBetween > 0) {
-                            const periodDecay = (prevAmount - currAmount) / prevAmount;
-                            totalDistDecay += periodDecay / weeksBetween;
-                            validDecays++;
-                        }
-                    }   
-                    distDecay = validDecays > 0 ? totalDistDecay / validDecays : 0;
-                }
-                } else {
-                    // Estimate from adjusted close if no dividends
-                    if (indicators.adjclose && indicators.adjclose[0].adjclose) {
-                        const adjClose = indicators.adjclose[0].adjclose;
-                        const weeklyAdjPrices = [];
-                        for (let i = 0; i < adjClose.length; i += 7) {
-                            if (adjClose[i]) weeklyAdjPrices.push(adjClose[i]);
-                        }
-                        
-                        if (weeklyAdjPrices.length >= 2) {
-                            const totalReturn = (weeklyAdjPrices[weeklyAdjPrices.length - 1] - weeklyPrices[0]) / weeklyPrices[0];
-                            const priceReturn = (weeklyPrices[weeklyPrices.length - 1] - weeklyPrices[0]) / weeklyPrices[0];
-                            const impliedYield = totalReturn - priceReturn;
-                            avgDistRate = Math.max(0, impliedYield / weeklyPrices.length);
-                        }
+                        for (let i = 1; i < dividends.length; i++) {
+                            const prevAmount = dividends[i-1].amount;
+                            const currAmount = dividends[i].amount;
+                            const timeDiff = dividends[i].date - dividends[i-1].date;
+                            const weeksBetween = timeDiff / (7 * 24 * 60 * 60);
+                            
+                            if (prevAmount > 0 && weeksBetween > 0) {
+                                const periodDecay = (prevAmount - currAmount) / prevAmount;
+                                totalDistDecay += periodDecay / weeksBetween;
+                                validDecays++;
+                            }
+                        }   
+                        distDecay = validDecays > 0 ? totalDistDecay / validDecays : 0;
                     }
-                }
+                } 
                 
                 // Store results
                 analyzedTicker = ticker;
