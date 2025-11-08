@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ETF Distribution & NAV Comparator v8</title>
+    <title>ETF Distribution & NAV Comparator v9</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * {
@@ -350,7 +350,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>ETF Distribution & NAV Comparator v8</h1>
+        <h1>ETF Distribution & NAV Comparator v9</h1>
         
         <div class="ticker-tool">
             <h3>Yahoo Finance Analysis</h3>
@@ -979,36 +979,31 @@
                 let dividendCount = 0;
                 let avgDistRate = 0;
                 let distDecay = 0;
-                
-                if (divData.chart && divData.chart.result && divData.chart.result[0].events && divData.chart.result[0].events.dividends) 
-                {
-                    const dividends = Object.values(divData.chart.result[0].events.dividends);
-                    totalDividends = dividends.reduce((sum, div) => sum + div.amount, 0);
-                    dividendCount = dividends.length;
-                    
-					//distribution rate
-					// Match each div to its price, then avg
-					const rates = divs.map(div => {
-						const idx = timestamps.reduce((best, t, i) =>
-							Math.abs(t - div.date) < Math.abs(timestamps[best] - div.date) ? i : best, 0);
-						return prices[idx] > 0 ? div.amount / prices[idx] : 0;
+
+				if (divData.chart?.result?.[0]?.events?.dividends) {
+					const dividends = Object.values(divData.chart.result[0].events.dividends);
+					const prices = result.indicators.quote[0].close, times = result.timestamp;
+
+					// avgDistRate = average(dividend / priceAtDate)
+					const rates = dividends.map(d => {
+						const idx = times.reduce((best, t, i) => Math.abs(t - d.date) < Math.abs(times[best] - d.date) ? i : best, 0);
+						return prices[idx] > 0 ? d.amount / prices[idx] : 0;
 					});
 
-					totalDividends = divs.reduce((s, d) => s + d.amount, 0);
-					dividendCount = divs.length;
+					totalDividends = dividends.reduce((s, d) => s + d.amount, 0);
+					dividendCount = dividends.length;
 					avgDistRate = rates.reduce((s, r) => s + r, 0) / (rates.length || 1);
-					
-					//distribution decay
-					// Decay: avg of period decay between consecutive divs
-					if (divs.length >= 2) {
+
+					// distDecay = average(periodDecay / weeksBetween)
+					if (dividends.length >= 2) {
 						const decays = [];
-						for (let i = 1; i < divs.length; i++) {
-							const p = divs[i - 1].amount, c = divs[i].amount, t = (divs[i].date - divs[i - 1].date) / 604800;
+						for (let i = 1; i < dividends.length; i++) {
+							const p = dividends[i - 1].amount, c = dividends[i].amount, t = (dividends[i].date - dividends[i - 1].date) / 604800;
 							if (p > 0 && t > 0) decays.push(((p - c) / p) / t);
 						}
 						distDecay = decays.reduce((s, d) => s + d, 0) / (decays.length || 1);
 					}
-                } 
+				}
                 
                 // Store results
                 analyzedTicker = ticker;
