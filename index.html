@@ -977,8 +977,8 @@
                 // Extract distribution data
                 let totalDividends = 0;
                 let dividendCount = 0;
-                let avgDistRate = 0.00;
-                let distDecay = 0.05;
+                let avgDistRate = 0;
+                let distDecay = 0;
                 
                 if (divData.chart && divData.chart.result && divData.chart.result[0].events && divData.chart.result[0].events.dividends) 
                 {
@@ -986,29 +986,28 @@
                     totalDividends = dividends.reduce((sum, div) => sum + div.amount, 0);
                     dividendCount = dividends.length;
                     
-                    const avgPrice = weeklyPrices.reduce((a, b) => a + b, 0) / weeklyPrices.length;
-                    const weeks = weeklyPrices.length - 1;
-                    avgDistRate = (totalDividends / weeks) / avgPrice;
+					//distribution rate
+					// Match each div to its price, then avg
+					const rates = divs.map(div => {
+						const idx = timestamps.reduce((best, t, i) =>
+							Math.abs(t - div.date) < Math.abs(timestamps[best] - div.date) ? i : best, 0);
+						return prices[idx] > 0 ? div.amount / prices[idx] : 0;
+					});
 
-                    //distribution decay
-                    if (dividends.length >= 2) {
-                        let totalDistDecay = 0;
-                        let validDecays = 0;
-                        
-                        for (let i = 1; i < dividends.length; i++) {
-                            const prevAmount = dividends[i-1].amount;
-                            const currAmount = dividends[i].amount;
-                            const timeDiff = dividends[i].date - dividends[i-1].date;
-                            const weeksBetween = timeDiff / (7 * 24 * 60 * 60);
-                            
-                            if (prevAmount > 0 && weeksBetween > 0) {
-                                const periodDecay = (prevAmount - currAmount) / prevAmount;
-                                totalDistDecay += periodDecay / weeksBetween;
-                                validDecays++;
-                            }
-                        }   
-                        distDecay = validDecays > 0 ? totalDistDecay / validDecays : 0;
-                    }
+					totalDividends = divs.reduce((s, d) => s + d.amount, 0);
+					dividendCount = divs.length;
+					avgDistRate = rates.reduce((s, r) => s + r, 0) / (rates.length || 1);
+					
+					//distribution decay
+					// Decay: avg of period decay between consecutive divs
+					if (divs.length >= 2) {
+						const decays = [];
+						for (let i = 1; i < divs.length; i++) {
+							const p = divs[i - 1].amount, c = divs[i].amount, t = (divs[i].date - divs[i - 1].date) / 604800;
+							if (p > 0 && t > 0) decays.push(((p - c) / p) / t);
+						}
+						distDecay = decays.reduce((s, d) => s + d, 0) / (decays.length || 1);
+					}
                 } 
                 
                 // Store results
