@@ -61,17 +61,18 @@
 
     <script>
         const PROXIES = [
-            'https://corsproxy.io/?',
             'https://api.allorigins.win/raw?url=',
-            'https://thingproxy.freeboard.io/fetch/',
-            'https://proxy.cors.sh/?'
+            'https://corsproxy.io/?',
+            'https://api.codetabs.com/v1/proxy?quest='
         ];
 
-        const CACHE_DURATION = 3600000; // 1 hour in ms
+        const CACHE_DURATION = 3600000;
+        const MAX_RETRIES = 5;
+        const RETRY_DELAY_BASE = 2000;
 
         function setCookie(name, value, days) {
             const expires = new Date(Date.now() + days * 864e5).toUTCString();
-            document.cookie = `${name}=${value}; expires=${expires}; path=/`;
+            document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax`;
         }
 
         function getCookie(name) {
@@ -96,32 +97,45 @@
         }
 
         function setSentimentCache(symbol, price, sentiment, weightedSentiment) {
-            const cache = {
-                price,
-                sentiment,
-                weightedSentiment,
-                timestamp: Date.now()
-            };
+            const cache = { price, sentiment, weightedSentiment, timestamp: Date.now() };
             setCookie(`sentiment_${symbol}`, JSON.stringify(cache), 30);
         }
 
-        async function fetchViaProxy(url, maxRetries = 4) {
+        async function fetchViaProxy(url, maxRetries = MAX_RETRIES) {
+            let lastError;
             for (let attempt = 0; attempt < maxRetries; attempt++) {
-                const proxy = PROXIES[attempt % PROXIES.length];
+                const proxyIndex = attempt % PROXIES.length;
+                const proxy = PROXIES[proxyIndex];
                 const proxiedUrl = proxy + encodeURIComponent(url);
-                console.log(`Attempt ${attempt + 1}: Fetching via proxy: ${proxiedUrl}`);
+                console.log(`Attempt ${attempt + 1}/${maxRetries}: ${proxy.slice(0, 30)}...`);
+                
                 try {
-                    const response = await fetch(proxiedUrl);
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 15000);
+                    
+                    const response = await fetch(proxiedUrl, { 
+                        signal: controller.signal,
+                        headers: { 'Accept': 'text/html,application/json,*/*' }
+                    });
+                    clearTimeout(timeoutId);
+                    
                     if (response.ok) {
+                        console.log(`Success with proxy ${proxyIndex + 1}`);
                         return response;
                     }
-                    console.log(`Proxy failed with status: ${response.status}`);
+                    console.log(`Proxy ${proxyIndex + 1} returned status: ${response.status}`);
+                    lastError = new Error(`Status ${response.status}`);
                 } catch (e) {
-                    console.log(`Proxy error: ${e.message}`);
+                    console.log(`Proxy ${proxyIndex + 1} error: ${e.message}`);
+                    lastError = e;
                 }
-                await delay(1000 * (attempt + 1));
+                
+                if (attempt < maxRetries - 1) {
+                    const delay = RETRY_DELAY_BASE * Math.pow(1.5, attempt);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                }
             }
-            throw new Error(`All proxies failed for ${url}`);
+            throw new Error(`All ${maxRetries} proxy attempts failed: ${lastError?.message || 'Unknown error'}`);
         }
 
         function updateStatus(message, type = 'info') {
@@ -150,216 +164,164 @@
             document.getElementById('total').style.display = 'block';
         }
 
-        async function delay(ms) {
-            return new Promise(resolve => setTimeout(resolve, ms));
-        }
-
         async function getHoldings(etfSymbol) {
-            updateStatus(`Fetching ETF holdings for ${etfSymbol} from stockanalysis.com via proxy...`);
+            updateStatus(`Fetching ETF holdings for ${etfSymbol}...`);
             const url = `https://stockanalysis.com/etf/${etfSymbol.toLowerCase()}/holdings/`;
             const proxyResponse = await fetchViaProxy(url);
-            updateStatus(`Proxy response status: ${proxyResponse.status}`);
+            
             if (!proxyResponse.ok) {
-                throw new Error(`Failed to fetch holdings page: ${proxyResponse.status} ${proxyResponse.statusText}`);
+                throw new Error(`Failed to fetch holdings: ${proxyResponse.status}`);
             }
+            
             const text = await proxyResponse.text();
-            updateStatus('Parsing holdings HTML...');
-            let doc;
-            try {
-                const parser = new DOMParser();
-                doc = parser.parseFromString(text, 'text/html');
-            } catch (e) {
-                throw new Error(`Failed to parse HTML: ${e.message}`);
-            }
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(text, 'text/html');
+            
             const table = doc.querySelector('table');
-            if (!table) {
-                throw new Error('No holdings table found on page');
-            }
-            const rows = table.querySelectorAll('tr');
-            if (rows.length < 2) {
-                throw new Error('No holdings rows found');
-            }
+            if (!table) throw new Error('No holdings table found');
+            
+            const rows = table.querySelectorAll('tbody tr');
+            if (rows.length === 0) throw new Error('No holdings rows found');
+            
             const holdings = [];
-            for (let i = 1; i < rows.length; i++) {
-                const tds = rows[i].querySelectorAll('td');
+            rows.forEach(row => {
+                const tds = row.querySelectorAll('td');
                 if (tds.length >= 4) {
                     const symbolCell = tds[1].textContent.trim();
                     const nameCell = tds[2].textContent.trim();
                     const weightStr = tds[3].textContent.trim().replace('%', '');
                     const weight = parseFloat(weightStr);
-                    if (symbolCell && /^[A-Z]{2,5}$/.test(symbolCell) && !isNaN(weight) && weight > 0) {
-                        holdings.push({
-                            symbol: symbolCell,
-                            name: nameCell,
-                            percent: weight
-                        });
+                    
+                    if (symbolCell && /^[A-Z]{1,5}$/.test(symbolCell) && !isNaN(weight) && weight > 0) {
+                        holdings.push({ symbol: symbolCell, name: nameCell, percent: weight });
                     }
                 }
-            }
-            updateStatus(`Successfully parsed ${holdings.length} valid stock holdings.`);
+            });
+            
+            updateStatus(`Parsed ${holdings.length} valid holdings`);
             return holdings;
         }
 
         async function getUnderlyingPrice(underlying) {
-            updateStatus(`Fetching spot price for ${underlying} from Yahoo chart API via proxy...`);
-            const url = `https://query1.finance.yahoo.com/v8/finance/chart/${underlying}?range=1d`;
+            updateStatus(`Fetching price for ${underlying}...`);
+            const url = `https://query1.finance.yahoo.com/v8/finance/chart/${underlying}?range=1d&interval=1d`;
             const proxyResponse = await fetchViaProxy(url);
-            updateStatus(`Yahoo chart proxy response status: ${proxyResponse.status}`);
-            if (!proxyResponse.ok) {
-                throw new Error(`Failed to fetch price: ${proxyResponse.status} ${proxyResponse.statusText}`);
-            }
+            
+            if (!proxyResponse.ok) throw new Error(`Failed to fetch price: ${proxyResponse.status}`);
+            
             const text = await proxyResponse.text();
-            let data;
-            try {
-                data = JSON.parse(text);
-            } catch (e) {
-                throw new Error(`Failed to parse price JSON: ${e.message}`);
-            }
+            const data = JSON.parse(text);
             const meta = data.chart?.result?.[0]?.meta;
-            if (!meta) {
-                throw new Error('No meta data returned');
-            }
-            const price = meta.regularMarketPrice || meta.previousClose || 0;
-            if (price === 0) {
-                throw new Error('No valid price returned');
-            }
-            updateStatus(`Spot price for ${underlying}: $${price.toFixed(2)}`);
+            
+            if (!meta) throw new Error('No price data');
+            
+            const price = meta.regularMarketPrice ?? meta.previousClose ?? 0;
+            if (price === 0) throw new Error('Invalid price');
+            
+            updateStatus(`Price for ${underlying}: $${price.toFixed(2)}`);
             return price;
         }
 
         async function getOptionChain(underlying) {
-            updateStatus(`Fetching options page for ${underlying} from Yahoo via proxy...`);
+            updateStatus(`Fetching options for ${underlying}...`);
             const url = `https://finance.yahoo.com/quote/${underlying}/options/`;
             const proxyResponse = await fetchViaProxy(url);
-            updateStatus(`Yahoo options proxy response status: ${proxyResponse.status}`);
-            if (!proxyResponse.ok) {
-                throw new Error(`Failed to fetch options page: ${proxyResponse.status} ${proxyResponse.statusText}`);
-            }
+            
+            if (!proxyResponse.ok) throw new Error(`Failed to fetch options: ${proxyResponse.status}`);
+            
             const text = await proxyResponse.text();
-            updateStatus('Parsing options HTML...');
-            let doc;
-            try {
-                const parser = new DOMParser();
-                doc = parser.parseFromString(text, 'text/html');
-            } catch (e) {
-                throw new Error(`Failed to parse options HTML: ${e.message}`);
-            }
-            let callsTable = doc.querySelector('table.calls');
-            let putsTable = doc.querySelector('table.puts');
-            if (!callsTable || !putsTable) {
-                const allTables = doc.querySelectorAll('table');
-                let callFound = false;
-                for (const table of allTables) {
-                    const ths = table.querySelectorAll('th');
-                    if (ths.length > 0 && Array.from(ths).some(th => th.textContent.includes('Open Int'))) {
-                        if (!callFound) {
-                            callsTable = table;
-                            callFound = true;
-                        } else {
-                            putsTable = table;
-                            break;
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(text, 'text/html');
+            
+            const allTables = doc.querySelectorAll('table');
+            const tables = Array.from(allTables).filter(t => {
+                const ths = t.querySelectorAll('th');
+                return Array.from(ths).some(th => th.textContent.includes('Strike') || th.textContent.includes('Open Interest'));
+            });
+            
+            if (tables.length < 2) throw new Error('Options tables not found');
+            
+            const allOptions = [];
+            tables.forEach(table => {
+                const rows = table.querySelectorAll('tbody tr');
+                rows.forEach(row => {
+                    const tds = row.querySelectorAll('td');
+                    if (tds.length >= 8) {
+                        const strikeText = tds[2]?.textContent.trim().replace(/[^\d.]/g, '') || '';
+                        const oiText = tds[tds.length - 1]?.textContent.trim().replace(/[^\d]/g, '') || '0';
+                        const strike = parseFloat(strikeText);
+                        const oi = parseInt(oiText) || 0;
+                        
+                        if (!isNaN(strike) && strike > 0 && oi > 0) {
+                            allOptions.push({ strike, oi });
                         }
                     }
-                }
-            }
-            if (!callsTable || !putsTable) throw new Error('No options tables found');
-            const allOptions = [];
-            const callsRows = callsTable.querySelectorAll('tbody tr');
-            callsRows.forEach(row => {
-                const tds = row.querySelectorAll('td');
-                if (tds.length >= 10) {
-                    const strikeText = tds[2].textContent.trim().replace(/[^\d.]/g, '');
-                    const oiText = tds[9].textContent.trim().replace(/[^\d]/g, '');
-                    const strike = parseFloat(strikeText);
-                    const oi = parseInt(oiText) || 0;
-                    if (!isNaN(strike) && oi > 0) {
-                        allOptions.push({strike, oi});
-                    }
-                }
+                });
             });
-            const putsRows = putsTable.querySelectorAll('tbody tr');
-            putsRows.forEach(row => {
-                const tds = row.querySelectorAll('td');
-                if (tds.length >= 10) {
-                    const strikeText = tds[2].textContent.trim().replace(/[^\d.]/g, '');
-                    const oiText = tds[9].textContent.trim().replace(/[^\d]/g, '');
-                    const strike = parseFloat(strikeText);
-                    const oi = parseInt(oiText) || 0;
-                    if (!isNaN(strike) && oi > 0) {
-                        allOptions.push({strike, oi});
-                    }
-                }
-            });
-            if (allOptions.length === 0) throw new Error('No options with open interest found');
-            updateStatus(`Successfully parsed ${allOptions.length} options with open interest.`);
+            
+            if (allOptions.length === 0) throw new Error('No valid options found');
+            
+            updateStatus(`Parsed ${allOptions.length} options`);
             return allOptions;
         }
 
         function calculateSentiment(allOptions, underlyingPrice) {
-            updateStatus(`Calculating sentiment for underlying price $${underlyingPrice.toFixed(2)}...`);
             let totalOI = 0;
             let weightedStrike = 0;
+            
             allOptions.forEach(opt => {
                 totalOI += opt.oi;
                 weightedStrike += opt.strike * opt.oi;
             });
-            updateStatus(`Processed ${allOptions.length} options, total OI: ${totalOI}`);
-            if (totalOI === 0) {
-                updateStatus('No open interest found, sentiment = 0');
-                return 0;
-            }
+            
+            if (totalOI === 0) return 0;
+            
             const avgStrike = weightedStrike / totalOI;
             let sentiment = (avgStrike - underlyingPrice) / underlyingPrice;
             sentiment = Math.max(-1, Math.min(1, sentiment));
-            updateStatus(`Average strike: $${avgStrike.toFixed(2)}, raw sentiment: ${sentiment.toFixed(4)}`);
+            
+            updateStatus(`Avg strike: $${avgStrike.toFixed(2)}, sentiment: ${sentiment.toFixed(4)}`);
             return sentiment;
         }
 
         async function processOneHolding(holding, forceRetry = false) {
             const underlying = holding.symbol;
             const weight = holding.percent;
-            let price = holding.price || 0;
-            let sentiment = holding.sentiment || 0;
-            let weightedSentiment = holding.weightedSentiment || 0;
 
             const cached = getSentimentCache(underlying);
             if (cached && !forceRetry) {
-                updateStatus(`Using cached sentiment for ${underlying} (fresh within 1 hour)`, 'info');
-                return {
-                    price: cached.price,
-                    sentiment: cached.sentiment,
-                    weightedSentiment: cached.weightedSentiment
-                };
+                updateStatus(`Using cache for ${underlying}`, 'info');
+                return { price: cached.price, sentiment: cached.sentiment, weightedSentiment: cached.weightedSentiment };
             }
 
             try {
-                price = await getUnderlyingPrice(underlying);
+                const price = await getUnderlyingPrice(underlying);
                 const allOptions = await getOptionChain(underlying);
-                sentiment = calculateSentiment(allOptions, price);
-                weightedSentiment = (weight / 100) * sentiment;
+                const sentiment = calculateSentiment(allOptions, price);
+                const weightedSentiment = (weight / 100) * sentiment;
+                
                 setSentimentCache(underlying, price, sentiment, weightedSentiment);
-                updateStatus(`Computed ${underlying}: sentiment ${sentiment.toFixed(4)}, weighted ${weightedSentiment.toFixed(4)} (cached for 1 hour)`, 'success');
+                updateStatus(`${underlying}: sentiment ${sentiment.toFixed(4)}`, 'success');
+                
+                return { price, sentiment, weightedSentiment };
             } catch (e) {
-                if (e.message.includes('All proxies failed')) {
-                    sentiment = null;
-                    updateStatus(`Proxy failure for ${underlying}: compute failed (ignored in counter)`, 'error');
-                } else {
-                    sentiment = 0;
-                    updateStatus(`Error processing ${underlying}: ${e.message} (sentiment = ${sentiment.toFixed(4)})`, 'error');
-                }
+                updateStatus(`Error ${underlying}: ${e.message}`, 'error');
+                return { price: 0, sentiment: null, weightedSentiment: 0 };
             }
-            return { price, sentiment, weightedSentiment };
         }
 
         function updateRow(holding, price, sentiment, weightedSentiment) {
             const tbody = document.querySelector('#trends tbody');
             let row = Array.from(tbody.rows).find(r => r.cells[0].textContent.trim() === holding.symbol);
+            
             let sentimentHtml;
             if (sentiment === null) {
-                sentimentHtml = '<span class="error">compute failed</span> (0.00% weighted)';
+                sentimentHtml = '<span class="error">failed</span>';
             } else {
-                sentimentHtml = `<span class="${sentiment > 0 ? 'bullish' : sentiment < 0 ? 'bearish' : 'neutral'}">${sentiment.toFixed(4)} (${(weightedSentiment * 100).toFixed(2)}% weighted)</span>`;
+                const cls = sentiment > 0 ? 'bullish' : sentiment < 0 ? 'bearish' : 'neutral';
+                sentimentHtml = `<span class="${cls}">${sentiment.toFixed(4)} (${(weightedSentiment * 100).toFixed(2)}%)</span>`;
             }
+            
             const rowHtml = `
                 <tr>
                     <td>${holding.symbol}</td>
@@ -370,6 +332,7 @@
                     <td>${sentimentHtml}</td>
                 </tr>
             `;
+            
             if (row) {
                 row.outerHTML = rowHtml;
             } else {
@@ -384,90 +347,77 @@
         async function analyze() {
             const symbol = document.getElementById('symbol').value.toUpperCase().trim();
             if (!symbol) return alert('Please enter a symbol');
+            
             const loading = document.getElementById('loading');
             const table = document.getElementById('trends');
             const totalDiv = document.getElementById('total');
             const statusDiv = document.getElementById('status');
             const holdingsList = document.getElementById('holdings-list');
             const progressDiv = document.getElementById('progress');
+            
             loading.style.display = 'block';
             table.style.display = 'none';
             totalDiv.style.display = 'none';
             holdingsList.style.display = 'none';
             progressDiv.style.display = 'none';
             statusDiv.innerHTML = '';
-            const tbody = table.querySelector('tbody');
-            tbody.innerHTML = '';
+            table.querySelector('tbody').innerHTML = '';
 
             try {
-                updateStatus(`Starting analysis for ETF: ${symbol}`, 'success');
-                let allHoldings = await getHoldings(symbol);
-                const totalHoldings = allHoldings.length;
-                if (totalHoldings === 0) {
-                    totalDiv.innerHTML = '<span class="neutral">Total Weighted Sentiment: --no holdings-- (No valid stock holdings found)</span>';
+                updateStatus(`Starting analysis for ${symbol}`, 'success');
+                const allHoldings = await getHoldings(symbol);
+                
+                if (allHoldings.length === 0) {
+                    totalDiv.innerHTML = '<span class="neutral">No valid holdings found</span>';
                     totalDiv.style.display = 'block';
-                    updateStatus('No valid holdings found.', 'error');
                     return;
                 }
-                updateStatus(`Processing ${totalHoldings} valid holdings in parallel (using cache if fresh)...`);
-
-                // Display found holdings for verification
+                
                 const holdingsHtml = allHoldings.map(h => `<p>${h.symbol} | ${h.name} | ${h.percent.toFixed(2)}%</p>`).join('');
-                holdingsList.innerHTML = `<strong>Found Holdings:</strong><br>${holdingsHtml}`;
+                holdingsList.innerHTML = `<strong>Found ${allHoldings.length} Holdings:</strong><br>${holdingsHtml}`;
                 holdingsList.style.display = 'block';
-
+                
                 table.style.display = 'table';
-                updateSummary(0, 0, totalHoldings);
-
-                // Parallel initial processing
-                const promises = allHoldings.map(holding => processOneHolding(holding));
-                const results = await Promise.all(promises);
-                results.forEach((result, index) => {
-                    const holding = allHoldings[index];
-                    holding.price = result.price;
-                    holding.sentiment = result.sentiment;
-                    holding.weightedSentiment = result.weightedSentiment;
-                    updateRow(holding, result.price, result.sentiment, result.weightedSentiment);
+                updateSummary(0, 0, allHoldings.length);
+                
+                const results = await Promise.all(allHoldings.map(h => processOneHolding(h)));
+                
+                results.forEach((result, i) => {
+                    allHoldings[i].price = result.price;
+                    allHoldings[i].sentiment = result.sentiment;
+                    allHoldings[i].weightedSentiment = result.weightedSentiment;
+                    updateRow(allHoldings[i], result.price, result.sentiment, result.weightedSentiment);
                 });
-                const runningTotal = calculateTotal(allHoldings);
-                const processed = allHoldings.filter(h => h.sentiment !== undefined && h.sentiment !== null && !isNaN(h.sentiment)).length;
-                updateSummary(runningTotal, processed, totalHoldings);
-
-                const failedHoldings = allHoldings.filter(h => h.sentiment === null || h.price === 0);
-                if (failedHoldings.length > 0) {
-                    updateStatus(`Initial processing complete. ${failedHoldings.length} failed. Starting 10s countdown for retry...`);
-                    for (let i = 10; i > 0; i--) {
-                        const countdownDiv = document.createElement('div');
-                        countdownDiv.id = 'retry-countdown';
-                        countdownDiv.textContent = `Retry in ${i}s...`;
-                        countdownDiv.className = 'info';
-                        statusDiv.appendChild(countdownDiv);
-                        await delay(1000);
-                        if (statusDiv.contains(countdownDiv)) {
-                            statusDiv.removeChild(countdownDiv);
-                        }
-                    }
-                    updateStatus('Retrying failed holdings in parallel...');
-                    const retryPromises = failedHoldings.map(holding => processOneHolding(holding, true));
-                    const retryResults = await Promise.all(retryPromises);
-                    retryResults.forEach((result, index) => {
-                        const holding = failedHoldings[index];
-                        holding.price = result.price;
-                        holding.sentiment = result.sentiment;
-                        holding.weightedSentiment = result.weightedSentiment;
-                        updateRow(holding, result.price, result.sentiment, result.weightedSentiment);
+                
+                let total = calculateTotal(allHoldings);
+                let processed = allHoldings.filter(h => h.sentiment !== null && !isNaN(h.sentiment)).length;
+                updateSummary(total, processed, allHoldings.length);
+                
+                const failed = allHoldings.filter(h => h.sentiment === null);
+                if (failed.length > 0) {
+                    updateStatus(`Retrying ${failed.length} failed holdings in 5s...`);
+                    await new Promise(resolve => setTimeout(resolve, 5000));
+                    
+                    const retryResults = await Promise.all(failed.map(h => processOneHolding(h, true)));
+                    
+                    retryResults.forEach((result, i) => {
+                        failed[i].price = result.price;
+                        failed[i].sentiment = result.sentiment;
+                        failed[i].weightedSentiment = result.weightedSentiment;
+                        updateRow(failed[i], result.price, result.sentiment, result.weightedSentiment);
                     });
-                    const finalTotal = calculateTotal(allHoldings);
-                    const finalProcessed = allHoldings.filter(h => h.sentiment !== undefined && h.sentiment !== null && !isNaN(h.sentiment)).length;
-                    updateSummary(finalTotal, finalProcessed, totalHoldings);
-                    updateStatus(`Retry complete.`, 'success');
+                    
+                    total = calculateTotal(allHoldings);
+                    processed = allHoldings.filter(h => h.sentiment !== null && !isNaN(h.sentiment)).length;
+                    updateSummary(total, processed, allHoldings.length);
                 }
-
-                updateStatus(`All processing complete.`, 'success');
+                
+                updateStatus('Analysis complete', 'success');
             } catch (error) {
-                updateStatus(`Overall error: ${error.message}`, 'error');
-                alert('Error during analysis: ' + error.message);
+                updateStatus(`Error: ${error.message}`, 'error');
+                alert('Analysis failed: ' + error.message);
             }
+            
             loading.style.display = 'none';
         }
     </script>
