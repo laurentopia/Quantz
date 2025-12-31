@@ -3,7 +3,7 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>ETF Distribution & NAV Comparator v14 - With History</title>
+	<title>ETF Distribution & NAV Comparator v15 - With History</title>
 	<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 	<style>
 		* {
@@ -371,7 +371,7 @@
 </head>
 <body>
 <div class="container">
-	<h1>ETF Distribution & NAV Comparator v14 - With History</h1>
+	<h1>ETF Distribution & NAV Comparator v15 - With History</h1>
 
 	<div class="ticker-tool">
 		<h3>Yahoo Finance Analysis</h3>
@@ -1078,8 +1078,8 @@
 			const period1 = Math.floor(new Date(startDate).getTime() / 1000);
 			const period2 = Math.floor(new Date(endDate).getTime() / 1000);
 
-			const priceUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?period1=${period1}&period2=${period2}&interval=1d`;
-			const divUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?period1=${period1}&period2=${period2}&interval=1d&events=div`;
+			const priceUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?period1=${period1}&period2=${period2}&interval=1wk`;
+			const divUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?period1=${period1}&period2=${period2}&interval=1wk&events=div`;
 
 			loadingDiv.textContent = `Fetching ${ticker} data from ${startDate} to ${endDate}...`;
 
@@ -1103,9 +1103,9 @@
 			const timestamps = result.timestamp;
 			const quotes = indicators.quote[0];
 
-			// Extract weekly price data
+			// Extract weekly price data (already weekly from API)
 			const weeklyPrices = [];
-			for (let i = 0; i < timestamps.length; i += 7) {
+			for (let i = 0; i < timestamps.length; i++) {
 				if (quotes.close && quotes.close[i]) {
 					weeklyPrices.push(quotes.close[i]);
 				}
