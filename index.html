@@ -3,7 +3,7 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>ETF Distribution & NAV Comparator v15 - With History</title>
+	<title>ETF Distribution & NAV Comparator v16 - With History</title>
 	<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 	<style>
 		* {
@@ -371,7 +371,7 @@
 </head>
 <body>
 <div class="container">
-	<h1>ETF Distribution & NAV Comparator v15 - With History</h1>
+	<h1>ETF Distribution & NAV Comparator v16 - With History</h1>
 
 	<div class="ticker-tool">
 		<h3>Yahoo Finance Analysis</h3>
@@ -734,6 +734,10 @@
 		const weeks = parseInt(document.getElementById('timeframe').value) || 52;
 		const initialInvestment = parseFloat(document.getElementById('initial-investment').value) || 10000;
 
+		console.log('Calculate called');
+		console.log('historicalData.etf1:', historicalData.etf1);
+		console.log('historicalData.etf2:', historicalData.etf2);
+
 		// Get ETF1 values
 		const etf1 = {
 			navDecay: parseFloat(document.getElementById('etf1-nav-decay').value) / 100 || 0,
@@ -764,6 +768,8 @@
 		} else if (historicalData.etf2) {
 			historicalWeeks = historicalData.etf2.length;
 		}
+
+		console.log('Historical weeks to display:', historicalWeeks);
 
 		for (let w = -historicalWeeks; w <= weeks; w++) {
 			labels.push(w);
@@ -890,6 +896,11 @@
 			element.parentElement.className = value > 100 ? 'delta-positive' : 'delta-negative';
 		});
 
+		console.log('etf1ValueHist:', etf1ValueHist);
+		console.log('etf2ValueHist:', etf2ValueHist);
+		console.log('etf1ValueHist has data?', etf1ValueHist.some(v => v !== null));
+		console.log('etf2ValueHist has data?', etf2ValueHist.some(v => v !== null));
+
 		// Prepare chart datasets
 		const datasets = [];
 
@@ -1004,6 +1015,10 @@
 		
 		// Use the historical prices that were already fetched during analysis (already in chronological order)
 		const histData = historicalWeeklyPrices ? [...historicalWeeklyPrices] : null;
+		
+		console.log('Applying to ETF', etfNumber);
+		console.log('Historical weekly prices:', historicalWeeklyPrices);
+		console.log('histData:', histData);
 		
 		// Update the actual input fields with analysis results
 		if (etfNumber === 1) {
