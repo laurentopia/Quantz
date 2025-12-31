@@ -754,10 +754,16 @@
 
 		// Generate labels (negative for historical, positive for projection)
 		const labels = [];
-		const historicalWeeks = Math.max(
-			historicalData.etf1 ? historicalData.etf1.length : 0,
-			historicalData.etf2 ? historicalData.etf2.length : 0
-		);
+		
+		// Find common historical range - only use the minimum of both
+		let historicalWeeks = 0;
+		if (historicalData.etf1 && historicalData.etf2) {
+			historicalWeeks = Math.min(historicalData.etf1.length, historicalData.etf2.length);
+		} else if (historicalData.etf1) {
+			historicalWeeks = historicalData.etf1.length;
+		} else if (historicalData.etf2) {
+			historicalWeeks = historicalData.etf2.length;
+		}
 
 		for (let w = -historicalWeeks; w <= weeks; w++) {
 			labels.push(w);
@@ -773,18 +779,22 @@
 		const etf2CumDist = [];
 		const etf2Drip = [];
 
-		// Add historical data (scaled to initial investment)
+		// Add historical data (scaled so most recent price = initial investment)
 		for (let i = 0; i < historicalWeeks; i++) {
-			if (historicalData.etf1 && i < historicalData.etf1.length) {
-				const scaleFactor = initialInvestment / historicalData.etf1[0];
-				etf1ValueHist.push(historicalData.etf1[i] * scaleFactor);
+			if (historicalData.etf1) {
+				// Use data from the end of the array (most recent historicalWeeks points)
+				const startIdx = historicalData.etf1.length - historicalWeeks;
+				const scaleFactor = initialInvestment / historicalData.etf1[historicalData.etf1.length - 1];
+				etf1ValueHist.push(historicalData.etf1[startIdx + i] * scaleFactor);
 			} else {
 				etf1ValueHist.push(null);
 			}
 
-			if (historicalData.etf2 && i < historicalData.etf2.length) {
-				const scaleFactor = initialInvestment / historicalData.etf2[0];
-				etf2ValueHist.push(historicalData.etf2[i] * scaleFactor);
+			if (historicalData.etf2) {
+				// Use data from the end of the array (most recent historicalWeeks points)
+				const startIdx = historicalData.etf2.length - historicalWeeks;
+				const scaleFactor = initialInvestment / historicalData.etf2[historicalData.etf2.length - 1];
+				etf2ValueHist.push(historicalData.etf2[startIdx + i] * scaleFactor);
 			} else {
 				etf2ValueHist.push(null);
 			}
@@ -992,8 +1002,8 @@
 	async function applyToETF(etfNumber) {
 		if (!analysisResults || !analyzedTicker) return;
 		
-		// Use the historical prices that were already fetched during analysis
-		const histData = historicalWeeklyPrices ? [...historicalWeeklyPrices].reverse() : null;
+		// Use the historical prices that were already fetched during analysis (already in chronological order)
+		const histData = historicalWeeklyPrices ? [...historicalWeeklyPrices] : null;
 		
 		// Update the actual input fields with analysis results
 		if (etfNumber === 1) {
@@ -1242,15 +1252,6 @@
 			loadingDiv.style.display = 'none';
 			analyzeBtn.disabled = false;
 			errorDiv.textContent = 'Error: ' + error.message;
-
-			if (currentProxyIndex < PROXY_ENDPOINTS.length - 1) {
-				infoDiv.textContent = `Proxy failed. Click "Retry with Backup Proxy" to try ${PROXY_ENDPOINTS[currentProxyIndex + 1].name}.`;
-				infoDiv.style.display = 'block';
-			} else {
-				infoDiv.textContent = 'All proxies failed. Try again later.';
-				infoDiv.style.display = 'block';
-			}
-
 			console.error(error);
 		}
 	}
