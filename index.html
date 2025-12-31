@@ -3,8 +3,9 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>ETF Distribution & NAV Comparator v16 - With History</title>
+	<title>ETF Distribution & NAV Comparator v17 - With Toggleable History</title>
 	<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.0.2"></script>
 	<style>
 		* {
 			margin: 0;
@@ -90,11 +91,34 @@
 		.timeframe {
 			margin-bottom: 20px;
 			text-align: center;
+			display: flex;
+			justify-content: center;
+			gap: 20px;
+			align-items: flex-end;
 		}
 
-		.timeframe input {
+		.timeframe .input-group {
 			width: 200px;
-			margin: 0 auto;
+			margin-bottom: 0;
+		}
+		
+		.toggle-group {
+			display: flex;
+			align-items: center;
+			padding-bottom: 10px;
+		}
+
+		.toggle-group label {
+			font-size: 14px;
+			cursor: pointer;
+			display: flex;
+			align-items: center;
+			margin-bottom: 0;
+		}
+		
+		.toggle-group input {
+			width: auto;
+			margin-right: 8px;
 		}
 
 		.controls {
@@ -371,7 +395,7 @@
 </head>
 <body>
 <div class="container">
-	<h1>ETF Distribution & NAV Comparator v16 - With History</h1>
+	<h1>ETF Distribution & NAV Comparator v17 - With History</h1>
 
 	<div class="ticker-tool">
 		<h3>Yahoo Finance Analysis</h3>
@@ -417,17 +441,23 @@
 		<div class="proxy-status" id="proxy-status"></div>
 	</div>
 
+	<div class="initial-investment">
+		<div class="input-group">
+			<label for="initial-investment">Initial Investment ($)</label>
+			<input type="number" id="initial-investment" value="10000" step="100" min="100">
+		</div>
+	</div>
+
 	<div class="timeframe">
 		<div class="input-group">
 			<label for="timeframe">Projection Time Frame (Weeks)</label>
 			<input type="number" id="timeframe" value="52" min="1" max="520">
 		</div>
-	</div>
-
-	<div class="initial-investment">
-		<div class="input-group">
-			<label for="initial-investment">Initial Investment ($)</label>
-			<input type="number" id="initial-investment" value="10000" step="100" min="100">
+		<div class="toggle-group">
+			<label title="Shows historical NAV data scaled to current investment for the overlapping period of both ETFs">
+				<input type="checkbox" id="show-history"> 
+				Show History (Min Range)
+			</label>
 		</div>
 	</div>
 
@@ -733,6 +763,7 @@
 	function calculate() {
 		const weeks = parseInt(document.getElementById('timeframe').value) || 52;
 		const initialInvestment = parseFloat(document.getElementById('initial-investment').value) || 10000;
+		const showHistory = document.getElementById('show-history').checked;
 
 		console.log('Calculate called');
 		console.log('historicalData.etf1:', historicalData.etf1);
@@ -761,12 +792,15 @@
 		
 		// Find common historical range - only use the minimum of both
 		let historicalWeeks = 0;
-		if (historicalData.etf1 && historicalData.etf2) {
-			historicalWeeks = Math.min(historicalData.etf1.length, historicalData.etf2.length);
-		} else if (historicalData.etf1) {
-			historicalWeeks = historicalData.etf1.length;
-		} else if (historicalData.etf2) {
-			historicalWeeks = historicalData.etf2.length;
+		
+		if (showHistory) {
+			if (historicalData.etf1 && historicalData.etf2) {
+				historicalWeeks = Math.min(historicalData.etf1.length, historicalData.etf2.length);
+			} else if (historicalData.etf1) {
+				historicalWeeks = historicalData.etf1.length;
+			} else if (historicalData.etf2) {
+				historicalWeeks = historicalData.etf2.length;
+			}
 		}
 
 		console.log('Historical weeks to display:', historicalWeeks);
@@ -787,7 +821,7 @@
 
 		// Add historical data (scaled so most recent price = initial investment)
 		for (let i = 0; i < historicalWeeks; i++) {
-			if (historicalData.etf1) {
+			if (historicalData.etf1 && showHistory) {
 				// Use data from the end of the array (most recent historicalWeeks points)
 				const startIdx = historicalData.etf1.length - historicalWeeks;
 				const scaleFactor = initialInvestment / historicalData.etf1[historicalData.etf1.length - 1];
@@ -796,7 +830,7 @@
 				etf1ValueHist.push(null);
 			}
 
-			if (historicalData.etf2) {
+			if (historicalData.etf2 && showHistory) {
 				// Use data from the end of the array (most recent historicalWeeks points)
 				const startIdx = historicalData.etf2.length - historicalWeeks;
 				const scaleFactor = initialInvestment / historicalData.etf2[historicalData.etf2.length - 1];
@@ -1252,7 +1286,7 @@
                         ` : ''}
                     </div>
                     <div class="history-notice">
-                        <strong>📊 Historical Data:</strong> When applied, up to 1 year of historical price data will be displayed on the chart.
+                        <strong>📊 Historical Data:</strong> When applied, toggle "Show History" to view the backtest on the chart.
                     </div>
                 `;
 
@@ -1276,6 +1310,7 @@
 
 	document.getElementById('timeframe').addEventListener('input', debouncedCalculate);
 	document.getElementById('initial-investment').addEventListener('input', debouncedCalculate);
+	document.getElementById('show-history').addEventListener('change', debouncedCalculate);
 
 	// ETF1 listeners
 	document.getElementById('etf1-nav-decay').addEventListener('input', debouncedCalculate);
@@ -1325,6 +1360,8 @@
 
 		params.set('weeks', document.getElementById('timeframe').value);
 		params.set('investment', document.getElementById('initial-investment').value);
+		params.set('history', document.getElementById('show-history').checked);
+		
 		params.set('etf1-nav-decay', document.getElementById('etf1-nav-decay').value);
 		params.set('etf1-dist-rate', document.getElementById('etf1-dist-rate').value);
 		params.set('etf1-dist-decay', document.getElementById('etf1-dist-decay').value);
@@ -1355,6 +1392,8 @@
 
 		if (params.has('weeks')) document.getElementById('timeframe').value = params.get('weeks');
 		if (params.has('investment')) document.getElementById('initial-investment').value = params.get('investment');
+		if (params.has('history')) document.getElementById('show-history').checked = params.get('history') === 'true';
+
 		if (params.has('etf1-nav-decay')) document.getElementById('etf1-nav-decay').value = params.get('etf1-nav-decay');
 		if (params.has('etf1-dist-rate')) document.getElementById('etf1-dist-rate').value = params.get('etf1-dist-rate');
 		if (params.has('etf1-dist-decay')) document.getElementById('etf1-dist-decay').value = params.get('etf1-dist-decay');
