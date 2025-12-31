@@ -3,7 +3,7 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>ETF Distribution & NAV Comparator v12</title>
+	<title>ETF Distribution & NAV Comparator v13 - With History</title>
 	<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 	<style>
 		* {
@@ -356,12 +356,22 @@
 		.analysis-results .metric-value {
 			color: #007bff;
 		}
+
+		.history-notice {
+			background: #e7f3ff;
+			border: 1px solid #b3d9ff;
+			padding: 10px;
+			border-radius: 4px;
+			font-size: 13px;
+			margin-top: 10px;
+			color: #004085;
+		}
 	</style>
 	<base target="_blank">
 </head>
 <body>
 <div class="container">
-	<h1>ETF Distribution & NAV Comparator v12</h1>
+	<h1>ETF Distribution & NAV Comparator v13 - With History</h1>
 
 	<div class="ticker-tool">
 		<h3>Yahoo Finance Analysis</h3>
@@ -409,7 +419,7 @@
 
 	<div class="timeframe">
 		<div class="input-group">
-			<label for="timeframe">Time Frame (Weeks)</label>
+			<label for="timeframe">Projection Time Frame (Weeks)</label>
 			<input type="number" id="timeframe" value="52" min="1" max="520">
 		</div>
 	</div>
@@ -564,12 +574,29 @@
 				},
 				title: {
 					display: true,
-					text: 'ETF Performance Comparison'
+					text: 'ETF Performance Comparison (Historical + Projected)'
 				},
 				tooltip: {
 					callbacks: {
 						label: function (context) {
 							return context.dataset.label + ': $' + context.parsed.y.toFixed(2);
+						}
+					}
+				},
+				annotation: {
+					annotations: {
+						line1: {
+							type: 'line',
+							xMin: 0,
+							xMax: 0,
+							borderColor: 'rgba(0, 0, 0, 0.5)',
+							borderWidth: 2,
+							borderDash: [10, 5],
+							label: {
+								display: true,
+								content: 'Today',
+								position: 'start'
+							}
 						}
 					}
 				}
@@ -579,7 +606,7 @@
 					display: true,
 					title: {
 						display: true,
-						text: 'Weeks'
+						text: 'Weeks (Negative = Historical, Positive = Projected)'
 					}
 				},
 				y: {
@@ -597,11 +624,13 @@
 	const colors = {
 		etf1: {
 			nav: 'rgb(54, 162, 235)',
+			navHistory: 'rgba(54, 162, 235, 0.3)',
 			dist: 'rgba(54, 162, 235, 0.5)',
 			drip: 'rgb(54, 162, 235)'
 		},
 		etf2: {
 			nav: 'rgb(255, 99, 132)',
+			navHistory: 'rgba(255, 99, 132, 0.3)',
 			dist: 'rgba(255, 99, 132, 0.5)',
 			drip: 'rgb(255, 99, 132)'
 		}
@@ -636,6 +665,8 @@
 	let etf2PeriodUnit = 'week';
 	let etf1Frequency = 'weekly';
 	let etf2Frequency = 'weekly';
+	let historicalData = {etf1: null, etf2: null};
+	let historicalWeeklyPrices = null; // Store the weekly prices from analysis
 
 	// Utility functions
 	function debounce(func, wait) {
@@ -721,30 +752,57 @@
 			absDist: parseFloat(document.getElementById('etf2-abs-dist').value) / 100 || 0
 		};
 
-		// Generate data
+		// Generate labels (negative for historical, positive for projection)
 		const labels = [];
+		const historicalWeeks = Math.max(
+			historicalData.etf1 ? historicalData.etf1.length : 0,
+			historicalData.etf2 ? historicalData.etf2.length : 0
+		);
+
+		for (let w = -historicalWeeks; w <= weeks; w++) {
+			labels.push(w);
+		}
+
+		// Initialize arrays for all data
+		const etf1ValueHist = [];
 		const etf1Value = [];
 		const etf1CumDist = [];
 		const etf1Drip = [];
+		const etf2ValueHist = [];
 		const etf2Value = [];
 		const etf2CumDist = [];
 		const etf2Drip = [];
 
-		// ETF1 calculations
+		// Add historical data (scaled to initial investment)
+		for (let i = 0; i < historicalWeeks; i++) {
+			if (historicalData.etf1 && i < historicalData.etf1.length) {
+				const scaleFactor = initialInvestment / historicalData.etf1[0];
+				etf1ValueHist.push(historicalData.etf1[i] * scaleFactor);
+			} else {
+				etf1ValueHist.push(null);
+			}
+
+			if (historicalData.etf2 && i < historicalData.etf2.length) {
+				const scaleFactor = initialInvestment / historicalData.etf2[0];
+				etf2ValueHist.push(historicalData.etf2[i] * scaleFactor);
+			} else {
+				etf2ValueHist.push(null);
+			}
+		}
+
+		// ETF1 projections
 		let value1 = initialInvestment;
 		let cumDist1 = 0;
 		let shares1 = 1;
 		let dripValue1 = initialInvestment;
 
-		// ETF2 calculations
+		// ETF2 projections
 		let value2 = initialInvestment;
 		let cumDist2 = 0;
 		let shares2 = 1;
 		let dripValue2 = initialInvestment;
 
 		for (let w = 0; w <= weeks; w++) {
-			labels.push(w);
-
 			// Store current value
 			etf1Value.push(value1);
 			etf2Value.push(value2);
@@ -794,7 +852,7 @@
 			value2 *= (1 - etf2.navDecay);
 		}
 
-		// Update summary
+		// Update summary (projections only)
 		document.getElementById('etf1-total-dist').textContent = '$' + cumDist1.toFixed(2);
 		document.getElementById('etf1-final-value').textContent = '$' + etf1Value[etf1Value.length - 1].toFixed(2);
 		document.getElementById('etf1-total-return').textContent = '$' + (etf1Value[etf1Value.length - 1] + cumDist1).toFixed(2);
@@ -822,78 +880,121 @@
 			element.parentElement.className = value > 100 ? 'delta-positive' : 'delta-negative';
 		});
 
+		// Prepare chart datasets
+		const datasets = [];
+
+		// ETF1 Historical
+		if (etf1ValueHist.some(v => v !== null)) {
+			datasets.push({
+				label: `${etfNames.etf1} Historical`,
+				data: [...etf1ValueHist, ...Array(weeks + 1).fill(null)],
+				borderColor: colors.etf1.navHistory,
+				backgroundColor: 'transparent',
+				borderWidth: 3,
+				pointRadius: 0,
+				yAxisID: 'y',
+			});
+		}
+
+		// ETF1 Projected Value
+		datasets.push({
+			label: `${etfNames.etf1} Projected Value`,
+			data: [...Array(historicalWeeks).fill(null), ...etf1Value],
+			borderColor: colors.etf1.nav,
+			backgroundColor: 'transparent',
+			borderWidth: 2,
+			borderDash: [5, 5],
+			pointRadius: 0,
+			yAxisID: 'y',
+		});
+
+		// ETF1 Distributions
+		datasets.push({
+			label: `${etfNames.etf1} Distributions`,
+			data: [...Array(historicalWeeks).fill(null), ...etf1CumDist],
+			borderColor: colors.etf1.dist,
+			backgroundColor: colors.etf1.dist,
+			fill: true,
+			tension: 0.1,
+			pointRadius: 0,
+			yAxisID: 'y',
+		});
+
+		// ETF1 DRIP
+		datasets.push({
+			label: `${etfNames.etf1} DRIP`,
+			data: [...Array(historicalWeeks).fill(null), ...etf1Drip],
+			borderColor: colors.etf1.drip,
+			backgroundColor: 'transparent',
+			pointHoverRadius: 6,
+			borderWidth: 2,
+			pointRadius: 0,
+			yAxisID: 'y',
+		});
+
+		// ETF2 Historical
+		if (etf2ValueHist.some(v => v !== null)) {
+			datasets.push({
+				label: `${etfNames.etf2} Historical`,
+				data: [...etf2ValueHist, ...Array(weeks + 1).fill(null)],
+				borderColor: colors.etf2.navHistory,
+				backgroundColor: 'transparent',
+				borderWidth: 3,
+				pointRadius: 0,
+				yAxisID: 'y',
+			});
+		}
+
+		// ETF2 Projected Value
+		datasets.push({
+			label: `${etfNames.etf2} Projected Value`,
+			data: [...Array(historicalWeeks).fill(null), ...etf2Value],
+			borderColor: colors.etf2.nav,
+			backgroundColor: 'transparent',
+			borderWidth: 2,
+			borderDash: [5, 5],
+			pointRadius: 0,
+			yAxisID: 'y',
+		});
+
+		// ETF2 Distributions
+		datasets.push({
+			label: `${etfNames.etf2} Distributions`,
+			data: [...Array(historicalWeeks).fill(null), ...etf2CumDist],
+			borderColor: colors.etf2.dist,
+			backgroundColor: colors.etf2.dist,
+			fill: true,
+			tension: 0.1,
+			pointRadius: 0,
+			yAxisID: 'y',
+		});
+
+		// ETF2 DRIP
+		datasets.push({
+			label: `${etfNames.etf2} DRIP`,
+			data: [...Array(historicalWeeks).fill(null), ...etf2Drip],
+			borderColor: colors.etf2.drip,
+			backgroundColor: 'transparent',
+			pointHoverRadius: 6,
+			borderWidth: 2,
+			pointRadius: 0,
+			yAxisID: 'y',
+		});
+
 		// Update chart
 		chart.data.labels = labels;
-		chart.data.datasets = [
-			{
-				label: `${etfNames.etf1} Value`,
-				data: etf1Value,
-				borderColor: colors.etf1.nav,
-				backgroundColor: 'transparent',
-				borderWidth: 2,
-				borderDash: [5, 5],
-				pointRadius: 0,
-				yAxisID: 'y',
-			},
-			{
-				label: `${etfNames.etf1} Distributions`,
-				data: etf1CumDist,
-				borderColor: colors.etf1.dist,
-				backgroundColor: colors.etf1.dist,
-				fill: true,
-				tension: 0.1,
-				pointRadius: 0,
-				yAxisID: 'y',
-			},
-			{
-				label: `${etfNames.etf1} DRIP`,
-				data: etf1Drip,
-				borderColor: colors.etf1.drip,
-				backgroundColor: 'transparent',
-				pointHoverRadius: 6,
-				borderWidth: 2,
-				pointRadius: 0,
-				yAxisID: 'y',
-			},
-			{
-				label: `${etfNames.etf2} Value`,
-				data: etf2Value,
-				borderColor: colors.etf2.nav,
-				backgroundColor: 'transparent',
-				borderWidth: 2,
-				borderDash: [5, 5],
-				pointRadius: 0,
-				yAxisID: 'y',
-			},
-			{
-				label: `${etfNames.etf2} Distributions`,
-				data: etf2CumDist,
-				borderColor: colors.etf2.dist,
-				backgroundColor: colors.etf2.dist,
-				fill: true,
-				tension: 0.1,
-				pointRadius: 0,
-				yAxisID: 'y',
-			},
-			{
-				label: `${etfNames.etf2} DRIP`,
-				data: etf2Drip,
-				borderColor: colors.etf2.drip,
-				backgroundColor: 'transparent',
-				pointHoverRadius: 6,
-				borderWidth: 2,
-				pointRadius: 0,
-				yAxisID: 'y',
-			}
-		];
-
+		chart.data.datasets = datasets;
 		chart.update('none');
 		updateURL();
 	}
 
 	// Apply analysis results to ETF
-	function applyToETF(etfNumber) {
+	async function applyToETF(etfNumber) {
 		if (!analysisResults || !analyzedTicker) return;
+		
+		// Use the historical prices that were already fetched during analysis
+		const histData = historicalWeeklyPrices ? [...historicalWeeklyPrices].reverse() : null;
+		
 		// Update the actual input fields with analysis results
 		if (etfNumber === 1) {
 			document.getElementById('etf1-nav-decay').value = (analysisResults.navDecay * 100).toFixed(3);
@@ -905,6 +1006,7 @@
 			etf1Interval = analysisResults.interval_weeks;
 			etf1PeriodUnit = analysisResults.period_unit;
 			etf1Frequency = analysisResults.frequency;
+			historicalData.etf1 = histData;
 			document.querySelector('#etf1-dist-rate-group label').textContent = `Distribution Rate (%/${etf1PeriodUnit})`;
 			document.querySelector('#etf1-abs-dist-group label').textContent = `Absolute Distribution (%/${etf1PeriodUnit})`;
 		} else if (etfNumber === 2) {
@@ -917,6 +1019,7 @@
 			etf2Interval = analysisResults.interval_weeks;
 			etf2PeriodUnit = analysisResults.period_unit;
 			etf2Frequency = analysisResults.frequency;
+			historicalData.etf2 = histData;
 			document.querySelector('#etf2-dist-rate-group label').textContent = `Distribution Rate (%/${etf2PeriodUnit})`;
 			document.querySelector('#etf2-abs-dist-group label').textContent = `Absolute Distribution (%/${etf2PeriodUnit})`;
 		}
@@ -1069,6 +1172,7 @@
 
 			// Store results
 			analyzedTicker = ticker;
+			historicalWeeklyPrices = weeklyPrices; // Store the historical prices
 			analysisResults = {
 				navDecay: avgNavDecay,
 				distRate: avgDistRate,
@@ -1121,6 +1225,9 @@
                             <span class="metric-value">${dividendCount} totaling $${totalDividends.toFixed(3)}</span>
                         </div>
                         ` : ''}
+                    </div>
+                    <div class="history-notice">
+                        <strong>📊 Historical Data:</strong> When applied, up to 1 year of historical price data will be displayed on the chart.
                     </div>
                 `;
 
