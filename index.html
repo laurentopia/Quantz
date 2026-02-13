@@ -3,7 +3,7 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>ETF Distribution & NAV Comparator v21 (Fixed)</title>
+	<title>ETF Distribution & NAV Comparator v25</title>
 	<!-- Compatible Chart.js v4 and Annotation v3 -->
 	<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 	<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
@@ -63,14 +63,24 @@
 		.summary-value { font-size: 1.5rem; font-weight: 700; color: #2c3e50; margin: 5px 0; }
 		.summary-sub { font-size: 0.9rem; color: #64748b; margin: 2px 0; }
 		
+		/* Comparison Colors & Styles */
+		.etf1-text { color: #2563eb; }
+		.etf2-text { color: #db2777; }
+		.small-tag { font-size: 0.7em; opacity: 0.7; font-weight: 400; color: #666; }
+
 		/* Delta */
 		.delta-comparison { margin-top: 15px; background: #f0fdf4; border: 1px solid #bbf7d0; padding: 15px; border-radius: 8px; }
 		.delta-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; text-align: center; }
 		
 		/* Buttons */
 		.btn-primary { background: #3b82f6; color: white; border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; font-weight: 600; width: 100%; transition: 0.2s; }
-		.btn-primary:hover:not(:disabled) { background: #2563eb; }
 		.btn-primary:disabled { background: #94a3b8; cursor: not-allowed; }
+
+		/* Specific Buttons */
+		#apply-1 { background-color: #2563eb; }
+		#apply-1:hover:not(:disabled) { background-color: #1d4ed8; }
+		#apply-2 { background-color: #db2777; }
+		#apply-2:hover:not(:disabled) { background-color: #be185d; }
 		
 		.apply-buttons { display: flex; gap: 10px; margin-top: 10px; }
 		
@@ -87,7 +97,7 @@
 <body>
 
 <div class="container">
-	<h1>ETF Distribution & NAV Comparator v21</h1>
+	<h1>ETF Distribution & NAV Comparator v25</h1>
 
 	<div class="ticker-tool">
 		<h3>1. Analyze Historical Data (Yahoo Finance)</h3>
@@ -153,7 +163,7 @@
 
 	<div class="controls">
 		<div class="etf-panel">
-			<h2 id="etf1-name">ETF 1</h2>
+			<h2 id="etf1-panel-title" class="etf1-text">ETF 1</h2>
 			<div class="input-group">
 				<label><input type="checkbox" id="etf1-decouple"> Decouple Yield from NAV</label>
 			</div>
@@ -176,7 +186,7 @@
 		</div>
 
 		<div class="etf-panel">
-			<h2 id="etf2-name">ETF 2</h2>
+			<h2 id="etf2-panel-title" class="etf2-text">ETF 2</h2>
 			<div class="input-group">
 				<label><input type="checkbox" id="etf2-decouple"> Decouple Yield from NAV</label>
 			</div>
@@ -205,7 +215,7 @@
 
 	<div class="summary">
 		<div class="summary-box">
-			<h3>ETF 1 Outcome</h3>
+			<h3 class="etf1-text"><span id="sum-title-1">ETF 1</span> <span class="small-tag">(ETF 1)</span></h3>
 			<div class="summary-sub">Value @ Week 0 (Today): <span id="etf1-val-today">$-</span></div>
 			<div class="summary-value" id="etf1-total-return">$-</div>
 			<div class="summary-sub">Total Return (NAV + Cash)</div>
@@ -215,7 +225,7 @@
 			<div class="summary-sub">DRIP Value: <span id="etf1-drip">$-</span></div>
 		</div>
 		<div class="summary-box">
-			<h3>ETF 2 Outcome</h3>
+			<h3 class="etf2-text"><span id="sum-title-2">ETF 2</span> <span class="small-tag">(ETF 2)</span></h3>
 			<div class="summary-sub">Value @ Week 0 (Today): <span id="etf2-val-today">$-</span></div>
 			<div class="summary-value" id="etf2-total-return">$-</div>
 			<div class="summary-sub">Total Return (NAV + Cash)</div>
@@ -391,7 +401,7 @@
 			}
 
 			// Calc Div Stats
-			let distRate = 0, distDecay = 0, unit = 'week', interval = 1;
+			let distRate = 0, distDecay = 0, distAccel = 0, unit = 'week', interval = 1;
 			if(rawDivs.length > 1) {
 				// Frequency
 				const daysSpan = (rawDivs[rawDivs.length-1].date - rawDivs[0].date) / 86400;
@@ -411,14 +421,52 @@
 				});
 				distRate = rateSum / rawDivs.length;
 
-				// Dist Decay (change in amount)
-				let dDecaySum = 0;
+				// --- Regression Logic for Acceleration ---
+				let decaySeries = [];
+				let avgDecaySum = 0;
+				let decayCount = 0;
+				const startTime = rawDivs[0].date;
+
 				for(let i=1; i<rawDivs.length; i++) {
-					if(rawDivs[i-1].amount > 0) dDecaySum += (rawDivs[i-1].amount - rawDivs[i].amount)/rawDivs[i-1].amount;
+					if(rawDivs[i-1].amount > 0) {
+						// Drop %
+						let d = (rawDivs[i-1].amount - rawDivs[i].amount) / rawDivs[i-1].amount;
+						
+						// Gap in weeks
+						let gapDays = (rawDivs[i].date - rawDivs[i-1].date) / 86400;
+						let gapWeeks = gapDays / 7;
+
+						// Ignore micro-gaps (bad data)
+						if(gapWeeks > 0.5) {
+							const normalizedDecay = d / gapWeeks;
+							avgDecaySum += normalizedDecay;
+							decayCount++;
+
+							// Prepare for Regression
+							// X = Time (weeks from start), Y = Decay Rate
+							const timeX = (rawDivs[i].date - startTime) / 604800;
+							decaySeries.push({ x: timeX, y: normalizedDecay });
+						}
+					}
 				}
-				// Normalize decay to weekly
-				const distDecayPerPeriod = dDecaySum / (rawDivs.length - 1);
-				distDecay = distDecayPerPeriod / (avgGap/7); 
+
+				if(decayCount > 0) distDecay = avgDecaySum / decayCount;
+
+				// Linear Regression (OLS) for Slope
+				if(decaySeries.length >= 3) {
+					let n = decaySeries.length;
+					let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+					decaySeries.forEach(p => {
+						sumX += p.x;
+						sumY += p.y;
+						sumXY += (p.x * p.y);
+						sumXX += (p.x * p.x);
+					});
+
+					// Slope = (n*SumXY - SumX*SumY) / (n*SumXX - SumX^2)
+					const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+					distAccel = slope;
+				}
 			}
 
 			analysisTemp = {
@@ -429,9 +477,14 @@
 				navDecay: avgNavDecay,
 				distRate,
 				distDecay,
+				distAccel,
 				interval,
 				unit
 			};
+
+			const accelColor = distAccel > 0 ? '#ef4444' : '#16a34a';
+			const accelSign = distAccel > 0 ? '+' : '';
+			const accelText = Math.abs(distAccel) < 0.00001 ? 'Stable' : `${accelSign}${(distAccel*100).toFixed(4)}%/wk²`;
 
 			status.innerHTML = `
 				<div class="analysis-results">
@@ -439,6 +492,7 @@
 					<div class="metric-row"><span>NAV Decay:</span> <span style="color:#2563eb">${(avgNavDecay*100).toFixed(3)}%/wk</span></div>
 					<div class="metric-row"><span>Dist Rate:</span> <span style="color:#16a34a">${(distRate*100).toFixed(3)}%/${unit}</span></div>
 					<div class="metric-row"><span>Yield Decay:</span> <span>${(distDecay*100).toFixed(3)}%/wk</span></div>
+					<div class="metric-row"><span>Decay Accel (Reg):</span> <span style="color:${accelColor}">${accelText}</span></div>
 					<div class="history-badge">Ready to Apply</div>
 				</div>`;
 			
@@ -469,7 +523,6 @@
 		etfConfig[`etf${id}`].name = analysisTemp.sym;
 		etfConfig[`etf${id}`].interval = analysisTemp.interval;
 		etfConfig[`etf${id}`].unit = analysisTemp.unit;
-		document.getElementById(`etf${id}-name`).innerText = analysisTemp.sym;
 		
 		// Store History Data
 		histData[`etf${id}`] = {
@@ -487,6 +540,12 @@
 		const weeks = parseInt(document.getElementById('timeframe').value) || 52;
 		const showHist = document.getElementById('show-history').checked;
 		const warning = document.getElementById('history-warning');
+		
+		// Update UI Titles based on Config Names
+		document.getElementById('etf1-panel-title').innerText = etfConfig.etf1.name;
+		document.getElementById('etf2-panel-title').innerText = etfConfig.etf2.name;
+		document.getElementById('sum-title-1').innerText = etfConfig.etf1.name;
+		document.getElementById('sum-title-2').innerText = etfConfig.etf2.name;
 
 		// 1. Determine History Range
 		let histLen = 0;
@@ -738,10 +797,7 @@
 		document.getElementById('show-history').checked = p.get('hist') === 'true';
 
 		// Load 1
-		if(p.has('n1')) {
-			etfConfig.etf1.name = p.get('n1');
-			document.getElementById('etf1-name').innerText = p.get('n1');
-		}
+		if(p.has('n1')) etfConfig.etf1.name = p.get('n1');
 		if(p.has('i1')) etfConfig.etf1.interval = parseInt(p.get('i1'));
 		if(p.has('u1')) etfConfig.etf1.unit = p.get('u1');
 		document.querySelector(`#etf1-rate-wrap label`).innerText = `Dist Rate (%/${etfConfig.etf1.unit})`;
@@ -752,10 +808,7 @@
 		if(p.get('dc1') === 'true') document.getElementById('etf1-decouple').click();
 
 		// Load 2
-		if(p.has('n2')) {
-			etfConfig.etf2.name = p.get('n2');
-			document.getElementById('etf2-name').innerText = p.get('n2');
-		}
+		if(p.has('n2')) etfConfig.etf2.name = p.get('n2');
 		if(p.has('i2')) etfConfig.etf2.interval = parseInt(p.get('i2'));
 		if(p.has('u2')) etfConfig.etf2.unit = p.get('u2');
 		document.querySelector(`#etf2-rate-wrap label`).innerText = `Dist Rate (%/${etfConfig.etf2.unit})`;
