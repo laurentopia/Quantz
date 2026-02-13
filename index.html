@@ -3,9 +3,10 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>ETF Distribution & NAV Comparator v20</title>
-	<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-	<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.0.2"></script>
+	<title>ETF Distribution & NAV Comparator v21 (Fixed)</title>
+	<!-- Compatible Chart.js v4 and Annotation v3 -->
+	<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
 	<style>
 		* { margin: 0; padding: 0; box-sizing: border-box; }
 		body {
@@ -86,7 +87,7 @@
 <body>
 
 <div class="container">
-	<h1>ETF Distribution & NAV Comparator v20</h1>
+	<h1>ETF Distribution & NAV Comparator v21</h1>
 
 	<div class="ticker-tool">
 		<h3>1. Analyze Historical Data (Yahoo Finance)</h3>
@@ -253,21 +254,21 @@
 <script>
 	// --- State & Config ---
 	let chart;
-	let histData = { etf1: null, etf2: null }; // Stores { prices: [], divs: [{date, amount}] }
+	let histData = { etf1: null, etf2: null }; 
 	let etfConfig = {
 		etf1: { name: 'ETF 1', interval: 1, unit: 'week' },
 		etf2: { name: 'ETF 2', interval: 1, unit: 'week' }
 	};
-	let analysisTemp = null; // Temp holder for analysis result
+	let analysisTemp = null; 
 
-	// Colors
+	// Colors - Translucent fills
 	const C = {
-		e1: { nav: '#2563eb', inc: '#93c5fd', drip: '#1e40af' }, // Blue
-		e2: { nav: '#db2777', inc: '#fbcfe8', drip: '#be185d' }, // Pink
-		histBg: 'rgba(255, 235, 59, 0.15)' // Yellow Overlay
+		e1: { nav: '#2563eb', inc: '#93c5fd', incFill: 'rgba(147, 197, 253, 0.4)', drip: '#1e40af' }, // Blue
+		e2: { nav: '#db2777', inc: '#fbcfe8', incFill: 'rgba(251, 207, 232, 0.4)', drip: '#be185d' }, // Pink
+		histBg: 'rgba(255, 235, 59, 0.15)' 
 	};
 
-	// --- Chart Setup ---
+	// --- Chart Setup (Chart.js 4 compatible) ---
 	const ctx = document.getElementById('chart').getContext('2d');
 	chart = new Chart(ctx, {
 		type: 'line',
@@ -284,7 +285,11 @@
 							const w = ctx[0].label;
 							return w < 0 ? `Week ${w} (History)` : `Week ${w} (Projection)`;
 						},
-						label: (ctx) => `${ctx.dataset.label}: $${ctx.parsed.y.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`
+						label: (ctx) => {
+							let val = ctx.parsed.y;
+							if(val === null || val === undefined) return '';
+							return `${ctx.dataset.label}: $${val.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+						}
 					}
 				},
 				annotation: {
@@ -313,10 +318,10 @@
 		}
 	});
 
-	// --- Networking (Proxy) ---
+	// --- Networking ---
 	const PROXIES = [
-		url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-		url => `https://corsproxy.io/?${encodeURIComponent(url)}`
+		url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+		url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
 	];
 	let proxyIdx = 0;
 
@@ -348,14 +353,20 @@
 		btns.forEach(b => b.disabled = true);
 
 		try {
-			const p1 = Math.floor(new Date(sDate).getTime()/1000);
-			const p2 = Math.floor(new Date(eDate).getTime()/1000);
+			// Date Fix: Force UTC to prevent shifting
+			const d1 = new Date(sDate);
+			const d2 = new Date(eDate);
+			const p1 = Math.floor(d1.getTime()/1000);
+			const p2 = Math.floor(d2.getTime()/1000) + 86400; // Add day to cover close
+			
 			const base = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?period1=${p1}&period2=${p2}&interval=1wk`;
 			
 			const [priceData, divData] = await Promise.all([
 				fetchYahoo(base),
 				fetchYahoo(base + '&events=div')
 			]);
+
+			if(!priceData.chart.result) throw new Error("No Data Found");
 
 			const res = priceData.chart.result[0];
 			const closes = res.indicators.quote[0].close;
@@ -366,7 +377,7 @@
 			const cleanTimes = [];
 			closes.forEach((c, i) => { if(c) { cleanPrices.push(c); cleanTimes.push(timestamps[i]); } });
 
-			if(cleanPrices.length < 5) throw new Error('Insufficient data');
+			if(cleanPrices.length < 5) throw new Error('Insufficient data points');
 
 			// Nav Decay
 			let decaySum = 0;
@@ -396,7 +407,7 @@
 					// Find closest price
 					const closestIdx = cleanTimes.reduce((prev, curr, i) => 
 						Math.abs(curr - d.date) < Math.abs(cleanTimes[prev] - d.date) ? i : prev, 0);
-					rateSum += (d.amount / cleanPrices[closestIdx]);
+					if(cleanPrices[closestIdx]) rateSum += (d.amount / cleanPrices[closestIdx]);
 				});
 				distRate = rateSum / rawDivs.length;
 
@@ -435,6 +446,7 @@
 			btns[2].disabled = false;
 
 		} catch (e) {
+			console.error(e);
 			status.innerHTML = `<div class="error">Error: ${e.message}</div>`;
 		} finally {
 			btns[0].disabled = false;
@@ -461,9 +473,9 @@
 		
 		// Store History Data
 		histData[`etf${id}`] = {
-			prices: [...analysisTemp.prices], // Weekly Closes
-			times: [...analysisTemp.times],   // Unix Timestamps
-			divs: [...analysisTemp.divs]      // {date, amount}
+			prices: [...analysisTemp.prices],
+			times: [...analysisTemp.times],
+			divs: [...analysisTemp.divs]
 		};
 
 		calculate();
@@ -485,7 +497,7 @@
 			const h2 = histData.etf2 ? histData.etf2.prices.length : 0;
 			if (h1 > 0 || h2 > 0) {
 				useHistory = true;
-				// Min Range if both exist, otherwise max of whatever exists
+				// Min Range if both exist
 				if (h1 > 0 && h2 > 0) histLen = Math.min(h1, h2);
 				else histLen = Math.max(h1, h2);
 			}
@@ -506,7 +518,6 @@
 			const decouple = document.getElementById(`etf${id}-decouple`).checked;
 			const absDist = parseFloat(document.getElementById(`etf${id}-abs-dist`).value)/100 || 0;
 
-			// Arrays aligned to labels
 			const dataNav = [];
 			const dataInc = [];
 			const dataDrip = [];
@@ -514,58 +525,44 @@
 			// --- Phase A: History (-histLen to 0) ---
 			let currNav = inv;
 			let currInc = 0;
-			let currDripShares = inv; // Tracking value of DRIP if we started with `inv` worth of shares
-			let dripSharesCount = 0; // Actual share count for drip logic? 
-			// Simpler DRIP: Value = Shares * Price. Start Shares = Inv / StartPrice.
+			let dripShares = 0;
 			
-			// If we have history for this ETF
 			const hasHist = useHistory && historyObj;
 			
 			if (hasHist) {
 				const prices = historyObj.prices;
 				const divs = historyObj.divs;
-				const startIdx = prices.length - histLen; // Index in raw data where backtest starts
+				const startIdx = prices.length - histLen; 
 				
-				// Normalize: Start Value = Investment
-				const startPrice = prices[startIdx];
+				// Safe Start
+				const startPrice = prices[startIdx] || prices[prices.length-1];
 				let shares = inv / startPrice;
-				let dripShares = inv / startPrice; // For DRIP calculation
+				dripShares = inv / startPrice;
 				
-				// Push start point (-histLen)
 				dataNav.push(inv);
 				dataInc.push(0);
 				dataDrip.push(inv);
 
-				// Loop from -histLen+1 to 0
 				for (let i = 1; i <= histLen; i++) {
 					const rawIdx = startIdx + i;
 					const price = prices[rawIdx];
-					if (price === undefined) { 
-						// Fallback if array mismatch
+					if (!price) { 
 						dataNav.push(null); dataInc.push(null); dataDrip.push(null); 
 						continue; 
 					}
 
-					// Check for dividends in this week (roughly)
-					// We match divs that occurred between time[rawIdx-1] and time[rawIdx]
-					const tStart = historyObj.times[rawIdx-1];
-					const tEnd = historyObj.times[rawIdx];
+					// Time window fix: rawIdx-1 can be invalid if rawIdx=0 (not possible here due to loop, but for safety)
+					// We need to look back 1 week
+					const tCurrent = historyObj.times[rawIdx];
+					const tPrev = rawIdx > 0 ? historyObj.times[rawIdx-1] : (tCurrent - 604800);
 					
-					// Sum dividends in this window
 					let divAmt = 0;
 					divs.forEach(d => {
-						if (d.date > tStart && d.date <= tEnd) divAmt += d.amount;
+						if (d.date > tPrev && d.date <= tCurrent) divAmt += d.amount;
 					});
 
-					// Update Cash (Income)
-					const weeklyIncome = divAmt * shares;
-					currInc += weeklyIncome;
-
-					// Update DRIP
-					const dripIncome = divAmt * dripShares;
-					dripShares += (dripIncome / price);
-
-					// Current Values
+					currInc += (divAmt * shares);
+					dripShares += ((divAmt * dripShares) / price);
 					currNav = shares * price;
 					
 					dataNav.push(currNav);
@@ -577,44 +574,34 @@
 				for (let i = 0; i < histLen; i++) {
 					dataNav.push(null); dataInc.push(null); dataDrip.push(null);
 				}
-				// At 0 (Today), start at Investment
 				dataNav.push(inv);
 				dataInc.push(0);
 				dataDrip.push(inv);
 			}
 
 			// --- Phase B: Projection (1 to weeks) ---
-			// Start from the last values calculated in Phase A
-			let pNav = dataNav[dataNav.length-1];
-			let pInc = dataInc[dataInc.length-1];
-			let pDrip = dataDrip[dataDrip.length-1];
-			
-			// For projection, we simulate 'Shares' abstractly or just Value decay
-			// Standard decay model: Value * (1 - decay)
+			// Start from the last valid values
+			let pNav = dataNav[dataNav.length-1] || inv;
+			let pInc = dataInc[dataInc.length-1] || 0;
+			let pDrip = dataDrip[dataDrip.length-1] || inv;
 			
 			for (let w = 1; w <= weeks; w++) {
-				// Calculate Distribution
 				let distAmount = 0;
 				if (w % cfg.interval === 0) {
 					const decayFactor = Math.pow(1 - distDecay, w);
 					if (decouple) {
-						distAmount = (absDist * decayFactor) * inv; // Fixed % of initial? Or current? Usually initial in these tools unless specified
+						distAmount = (absDist * decayFactor) * inv; 
 					} else {
 						distAmount = pNav * (distRate * decayFactor);
 					}
 				}
 
 				pInc += distAmount;
+				pDrip += distAmount;
 				
-				// DRIP: Add dist to value
-				pDrip += distAmount; // Simple accumulation + growth? 
-				// Better DRIP Projection: Value grows by Dist, then decays
-				// pDrip (before decay) += Dist. Then pDrip decays.
-				// But Nav Decay removes value. Dist adds value.
-				
-				// Update NAV (Decay)
+				// Standard decay (negative decay = growth)
 				pNav *= (1 - navDecay);
-				pDrip *= (1 - navDecay); // Apply NAV decay to DRIP pool too
+				pDrip *= (1 - navDecay);
 
 				dataNav.push(pNav);
 				dataInc.push(pInc);
@@ -624,32 +611,30 @@
 			return { nav: dataNav, inc: dataInc, drip: dataDrip };
 		};
 
-		// 3. Compute
 		const res1 = calcETF(1, histData.etf1, C.e1);
 		const res2 = calcETF(2, histData.etf2, C.e2);
 
 		// 4. Update Summary
 		const final1 = {
-			valToday: res1.nav[histLen],
-			nav: res1.nav[res1.nav.length-1],
-			inc: res1.inc[res1.inc.length-1],
-			drip: res1.drip[res1.drip.length-1]
+			valToday: res1.nav[histLen] || 0,
+			nav: res1.nav[res1.nav.length-1] || 0,
+			inc: res1.inc[res1.inc.length-1] || 0,
+			drip: res1.drip[res1.drip.length-1] || 0
 		};
 		const final2 = {
-			valToday: res2.nav[histLen],
-			nav: res2.nav[res2.nav.length-1],
-			inc: res2.inc[res2.inc.length-1],
-			drip: res2.drip[res2.drip.length-1]
+			valToday: res2.nav[histLen] || 0,
+			nav: res2.nav[res2.nav.length-1] || 0,
+			inc: res2.inc[res2.inc.length-1] || 0,
+			drip: res2.drip[res2.drip.length-1] || 0
 		};
 
-		// ETF 1 DOM
+		// DOM Updates
 		document.getElementById('etf1-val-today').innerText = `$${final1.valToday.toLocaleString(undefined, {maximumFractionDigits:0})}`;
 		document.getElementById('etf1-final-nav').innerText = `$${final1.nav.toLocaleString(undefined, {maximumFractionDigits:0})}`;
 		document.getElementById('etf1-total-inc').innerText = `$${final1.inc.toLocaleString(undefined, {maximumFractionDigits:0})}`;
 		document.getElementById('etf1-drip').innerText = `$${final1.drip.toLocaleString(undefined, {maximumFractionDigits:0})}`;
 		document.getElementById('etf1-total-return').innerText = `$${(final1.nav + final1.inc).toLocaleString(undefined, {maximumFractionDigits:0})}`;
 
-		// ETF 2 DOM
 		document.getElementById('etf2-val-today').innerText = `$${final2.valToday.toLocaleString(undefined, {maximumFractionDigits:0})}`;
 		document.getElementById('etf2-final-nav').innerText = `$${final2.nav.toLocaleString(undefined, {maximumFractionDigits:0})}`;
 		document.getElementById('etf2-total-inc').innerText = `$${final2.inc.toLocaleString(undefined, {maximumFractionDigits:0})}`;
@@ -657,9 +642,9 @@
 		document.getElementById('etf2-total-return').innerText = `$${(final2.nav + final2.inc).toLocaleString(undefined, {maximumFractionDigits:0})}`;
 
 		// Delta
-		const dInc = ((final1.inc / final2.inc) - 1) * 100;
-		const dRet = (((final1.nav+final1.inc) / (final2.nav+final2.inc)) - 1) * 100;
-		const dDrip = ((final1.drip / final2.drip) - 1) * 100;
+		const dInc = final2.inc ? ((final1.inc / final2.inc) - 1) * 100 : 0;
+		const dRet = (final2.nav+final2.inc) ? (((final1.nav+final1.inc) / (final2.nav+final2.inc)) - 1) * 100 : 0;
+		const dDrip = final2.drip ? ((final1.drip / final2.drip) - 1) * 100 : 0;
 
 		const fmtDelta = (val, el) => {
 			const txt = (val > 0 ? '+' : '') + val.toFixed(1) + '%';
@@ -676,15 +661,14 @@
 		chart.data.datasets = [
 			// ETF 1
 			{ label: `${etfConfig.etf1.name} Value`, data: res1.nav, borderColor: C.e1.nav, borderWidth: 3, pointRadius: 0, tension: 0.1 },
-			{ label: `${etfConfig.etf1.name} Income`, data: res1.inc, borderColor: C.e1.inc, backgroundColor: C.e1.inc, fill: true, pointRadius: 0, borderWidth: 1 },
+			{ label: `${etfConfig.etf1.name} Income`, data: res1.inc, borderColor: C.e1.inc, backgroundColor: C.e1.incFill, fill: true, pointRadius: 0, borderWidth: 1 },
 			{ label: `${etfConfig.etf1.name} DRIP`, data: res1.drip, borderColor: C.e1.drip, borderWidth: 2, borderDash: [2,2], pointRadius: 0 },
 			// ETF 2
 			{ label: `${etfConfig.etf2.name} Value`, data: res2.nav, borderColor: C.e2.nav, borderWidth: 3, pointRadius: 0, tension: 0.1 },
-			{ label: `${etfConfig.etf2.name} Income`, data: res2.inc, borderColor: C.e2.inc, backgroundColor: C.e2.inc, fill: true, pointRadius: 0, borderWidth: 1 },
+			{ label: `${etfConfig.etf2.name} Income`, data: res2.inc, borderColor: C.e2.inc, backgroundColor: C.e2.incFill, fill: true, pointRadius: 0, borderWidth: 1 },
 			{ label: `${etfConfig.etf2.name} DRIP`, data: res2.drip, borderColor: C.e2.drip, borderWidth: 2, borderDash: [2,2], pointRadius: 0 }
 		];
 		
-		// Annotation update
 		chart.options.plugins.annotation.annotations.histZone.display = useHistory;
 		chart.update();
 
@@ -720,13 +704,14 @@
 	// URL State
 	function updateUrl() {
 		const p = new URLSearchParams();
-		// Globals
 		p.set('inv', document.getElementById('initial-investment').value);
 		p.set('wks', document.getElementById('timeframe').value);
 		p.set('hist', document.getElementById('show-history').checked);
 		
 		// ETF 1
 		p.set('n1', etfConfig.etf1.name);
+		p.set('i1', etfConfig.etf1.interval); // Save Interval
+		p.set('u1', etfConfig.etf1.unit);     // Save Unit
 		p.set('nd1', document.getElementById('etf1-nav-decay').value);
 		p.set('dr1', document.getElementById('etf1-dist-rate').value);
 		p.set('dd1', document.getElementById('etf1-dist-decay').value);
@@ -734,6 +719,8 @@
 		
 		// ETF 2
 		p.set('n2', etfConfig.etf2.name);
+		p.set('i2', etfConfig.etf2.interval); // Save Interval
+		p.set('u2', etfConfig.etf2.unit);     // Save Unit
 		p.set('nd2', document.getElementById('etf2-nav-decay').value);
 		p.set('dr2', document.getElementById('etf2-dist-rate').value);
 		p.set('dd2', document.getElementById('etf2-dist-decay').value);
@@ -755,6 +742,10 @@
 			etfConfig.etf1.name = p.get('n1');
 			document.getElementById('etf1-name').innerText = p.get('n1');
 		}
+		if(p.has('i1')) etfConfig.etf1.interval = parseInt(p.get('i1'));
+		if(p.has('u1')) etfConfig.etf1.unit = p.get('u1');
+		document.querySelector(`#etf1-rate-wrap label`).innerText = `Dist Rate (%/${etfConfig.etf1.unit})`;
+
 		document.getElementById('etf1-nav-decay').value = p.get('nd1');
 		document.getElementById('etf1-dist-rate').value = p.get('dr1');
 		document.getElementById('etf1-dist-decay').value = p.get('dd1');
@@ -765,6 +756,10 @@
 			etfConfig.etf2.name = p.get('n2');
 			document.getElementById('etf2-name').innerText = p.get('n2');
 		}
+		if(p.has('i2')) etfConfig.etf2.interval = parseInt(p.get('i2'));
+		if(p.has('u2')) etfConfig.etf2.unit = p.get('u2');
+		document.querySelector(`#etf2-rate-wrap label`).innerText = `Dist Rate (%/${etfConfig.etf2.unit})`;
+
 		document.getElementById('etf2-nav-decay').value = p.get('nd2');
 		document.getElementById('etf2-dist-rate').value = p.get('dr2');
 		document.getElementById('etf2-dist-decay').value = p.get('dd2');
