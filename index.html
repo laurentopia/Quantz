@@ -3,7 +3,7 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>ETF Distribution & NAV Comparator v27</title>
+	<title>ETF Distribution & NAV Comparator v28</title>
 	<!-- Compatible Chart.js v4 and Annotation v3 -->
 	<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 	<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
@@ -97,7 +97,7 @@
 <body>
 
 <div class="container">
-	<h1>ETF Distribution & NAV Comparator v27</h1>
+	<h1>ETF Distribution & NAV Comparator v28</h1>
 
 	<div class="ticker-tool">
 		<h3>1. Analyze Historical Data (Yahoo Finance)</h3>
@@ -174,7 +174,7 @@
 			</div>
 			<div class="input-group">
 				<label>NAV Decay Accel (%/week²)</label>
-				<input type="number" id="etf1-nav-accel" value="0.0" step="0.0001">
+				<input type="number" id="etf1-nav-accel" value="0.0" step="0.00001">
 			</div>
 			<div class="input-group" id="etf1-rate-wrap">
 				<label>Dist Rate (%/week)</label>
@@ -190,7 +190,7 @@
 			</div>
 			<div class="input-group">
 				<label>Yield Decay Accel (%/week²)</label>
-				<input type="number" id="etf1-dist-accel" value="0.0" step="0.0001">
+				<input type="number" id="etf1-dist-accel" value="0.0" step="0.00001">
 			</div>
 		</div>
 
@@ -206,7 +206,7 @@
 			</div>
 			<div class="input-group">
 				<label>NAV Decay Accel (%/week²)</label>
-				<input type="number" id="etf2-nav-accel" value="0.0" step="0.0001">
+				<input type="number" id="etf2-nav-accel" value="0.0" step="0.00001">
 			</div>
 			<div class="input-group" id="etf2-rate-wrap">
 				<label>Dist Rate (%/week)</label>
@@ -222,7 +222,7 @@
 			</div>
 			<div class="input-group">
 				<label>Yield Decay Accel (%/week²)</label>
-				<input type="number" id="etf2-dist-accel" value="0.0" step="0.0001">
+				<input type="number" id="etf2-dist-accel" value="0.0" step="0.00001">
 			</div>
 		</div>
 	</div>
@@ -341,7 +341,7 @@
 			},
 			scales: {
 				x: { title: { display: true, text: 'Weeks (0 = Today)' }, grid: { color: (ctx) => ctx.tick.value === 0 ? '#94a3b8' : '#e2e8f0' } },
-				y: { title: { display: true, text: 'Value ($)' } }
+				y: { title: { display: true, text: 'Value ($)', min: 0 } }
 			}
 		}
 	});
@@ -426,12 +426,14 @@
 			// --- NAV Decay & Acceleration ---
 			let navDecaySeries = [];
 			let decaySum = 0;
+			const startT = cleanTimes[0];
 			
 			for(let i=1; i<cleanPrices.length; i++) {
 				const drop = (cleanPrices[i-1] - cleanPrices[i]) / cleanPrices[i-1];
 				decaySum += drop;
-				// x = week index, y = drop %
-				navDecaySeries.push({ x: i, y: drop });
+				// x = time in weeks from start, y = drop %
+				const timeX = (cleanTimes[i] - startT) / 604800;
+				navDecaySeries.push({ x: timeX, y: drop });
 			}
 			const avgNavDecay = decaySum / (cleanPrices.length-1);
 			const navAccel = calculateSlope(navDecaySeries);
@@ -545,11 +547,11 @@
 		
 		// Set Inputs
 		document.getElementById(`etf${id}-nav-decay`).value = (analysisTemp.navDecay * 100).toFixed(3);
-		document.getElementById(`etf${id}-nav-accel`).value = (analysisTemp.navAccel * 100).toFixed(4);
+		document.getElementById(`etf${id}-nav-accel`).value = (analysisTemp.navAccel * 100).toFixed(5);
 		
 		document.getElementById(`etf${id}-dist-rate`).value = (analysisTemp.distRate * 100).toFixed(3);
 		document.getElementById(`etf${id}-dist-decay`).value = (analysisTemp.distDecay * 100).toFixed(3);
-		document.getElementById(`etf${id}-dist-accel`).value = (analysisTemp.distAccel * 100).toFixed(4); 
+		document.getElementById(`etf${id}-dist-accel`).value = (analysisTemp.distAccel * 100).toFixed(5); 
 		
 		// Update Labels
 		document.querySelector(`#etf${id}-rate-wrap label`).innerText = `Dist Rate (%/${analysisTemp.unit})`;
@@ -709,8 +711,14 @@
 				// 2. Calculate NAV Decay for this week
 				let currentNavDecay = navDecay + (navAccel * w);
 				
-				pNav *= (1 - currentNavDecay);
-				pDrip *= (1 - currentNavDecay);
+				// Death Spiral Logic: If decay > 100% or Price < Penny, kill it.
+				if (currentNavDecay >= 1 || pNav < 0.01) {
+					pNav = 0;
+					pDrip = 0; // Value wiped out
+				} else {
+					pNav *= (1 - currentNavDecay);
+					pDrip *= (1 - currentNavDecay);
+				}
 
 				dataNav.push(pNav);
 				dataInc.push(pInc);
