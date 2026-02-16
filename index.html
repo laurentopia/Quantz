@@ -3,7 +3,7 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>ETF Distribution & NAV Comparator v29</title>
+	<title>ETF Distribution & NAV Comparator v30</title>
 	<!-- Compatible Chart.js v4 and Annotation v3 -->
 	<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 	<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
@@ -28,7 +28,9 @@
 		
 		/* Ticker Tool */
 		.ticker-tool { background: #eef2f7; padding: 20px; border-radius: 8px; margin-bottom: 25px; border: 1px solid #d1d9e6; }
-		.ticker-inputs { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 10px; align-items: end; }
+		.ticker-inputs { display: grid; grid-template-columns: 1fr 1fr 1fr 1.5fr; gap: 15px; align-items: end; }
+		.action-group { display: flex; gap: 10px; }
+		
 		.quick-tickers { margin-top: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
 		.quick-tickers button { 
 			padding: 4px 10px; font-size: 11px; background: #5c6c7f; color: white; border: none; border-radius: 4px; cursor: pointer; transition: 0.2s;
@@ -77,12 +79,10 @@
 		.btn-primary:disabled { background: #94a3b8; cursor: not-allowed; }
 
 		/* Specific Buttons */
-		#apply-1 { background-color: #2563eb; }
-		#apply-1:hover:not(:disabled) { background-color: #1d4ed8; }
-		#apply-2 { background-color: #db2777; }
-		#apply-2:hover:not(:disabled) { background-color: #be185d; }
-		
-		.apply-buttons { display: flex; gap: 10px; margin-top: 10px; }
+		#btn-1 { background-color: #2563eb; }
+		#btn-1:hover:not(:disabled) { background-color: #1d4ed8; }
+		#btn-2 { background-color: #db2777; }
+		#btn-2:hover:not(:disabled) { background-color: #be185d; }
 		
 		/* Utilities */
 		.hidden { display: none; }
@@ -97,10 +97,10 @@
 <body>
 
 <div class="container">
-	<h1>ETF Distribution & NAV Comparator v29</h1>
+	<h1>ETF Distribution & NAV Comparator v30</h1>
 
 	<div class="ticker-tool">
-		<h3>1. Analyze Historical Data (Yahoo Finance)</h3>
+		<h3>1. Analyze & Apply Historical Data (Yahoo Finance)</h3>
 		<div class="ticker-inputs">
 			<div class="input-group">
 				<label>Ticker</label>
@@ -114,9 +114,9 @@
 				<label>End Date</label>
 				<input type="date" id="end-date">
 			</div>
-			<div class="input-group">
-				<label>&nbsp;</label>
-				<button class="btn-primary" id="analyze-btn" onclick="analyzeTicker()">Analyze</button>
+			<div class="input-group action-group">
+				<button class="btn-primary" id="btn-1" onclick="runAnalysis(1)">Analyze &rarr; ETF 1</button>
+				<button class="btn-primary" id="btn-2" onclick="runAnalysis(2)">Analyze &rarr; ETF 2</button>
 			</div>
 		</div>
 		<div id="ticker-status"></div>
@@ -134,11 +134,6 @@
 			<button onclick="setTicker('BLOX')">BLOX</button>
 			<button onclick="setTicker('KYLD')">KYLD</button>
 			<button onclick="setTicker('ULTI')">ULTI</button>
-		</div>
-
-		<div class="apply-buttons">
-			<button class="btn-primary" id="apply-1" disabled onclick="applyToETF(1)">Apply to ETF 1</button>
-			<button class="btn-primary" id="apply-2" disabled onclick="applyToETF(2)">Apply to ETF 2</button>
 		</div>
 	</div>
 
@@ -158,7 +153,7 @@
 	</div>
 	
 	<div id="history-warning" class="error" style="text-align: center; display: none; margin-bottom: 20px;">
-		⚠️ History enabled but no data loaded. Use "Analyze Ticker" first.
+		⚠️ History enabled but no data loaded. Analyze a ticker first.
 	</div>
 
 	<div class="controls">
@@ -287,7 +282,6 @@
 		etf1: { name: 'ETF 1', interval: 1, unit: 'week' },
 		etf2: { name: 'ETF 2', interval: 1, unit: 'week' }
 	};
-	let analysisTemp = null; 
 
 	// Colors - Translucent fills
 	const C = {
@@ -381,19 +375,19 @@
 		return slope;
 	}
 
-	// --- Analysis ---
+	// --- Analysis & Apply Logic ---
 	function setTicker(t) { document.getElementById('ticker').value = t; }
 
-	async function analyzeTicker() {
+	async function runAnalysis(targetId) {
 		const sym = document.getElementById('ticker').value.toUpperCase();
 		const sDate = document.getElementById('start-date').value;
 		const eDate = document.getElementById('end-date').value;
 		const status = document.getElementById('ticker-status');
-		const btns = [document.getElementById('analyze-btn'), document.getElementById('apply-1'), document.getElementById('apply-2')];
+		const btns = [document.getElementById('btn-1'), document.getElementById('btn-2')];
 
 		if(!sym || !sDate || !eDate) return alert('Please fill ticker and dates');
 		
-		status.innerHTML = '<div class="loading">Fetching data...</div>';
+		status.innerHTML = `<div class="loading">Analyzing ${sym} for ETF ${targetId}...</div>`;
 		btns.forEach(b => b.disabled = true);
 
 		try {
@@ -498,78 +492,46 @@
 				distAccel = calculateSlope(yieldDecaySeries);
 			}
 
-			analysisTemp = {
-				sym,
-				prices: cleanPrices,
-				times: cleanTimes,
-				divs: rawDivs,
-				navDecay: avgNavDecay,
-				navAccel: navAccel,
-				distRate,
-				distDecay,
-				distAccel,
-				interval,
-				unit
+			// --- Apply to Slot ---
+			// Set Inputs
+			document.getElementById(`etf${targetId}-nav-decay`).value = (avgNavDecay * 100).toFixed(3);
+			document.getElementById(`etf${targetId}-nav-accel`).value = (navAccel * 100).toFixed(5);
+			
+			document.getElementById(`etf${targetId}-dist-rate`).value = (distRate * 100).toFixed(3);
+			document.getElementById(`etf${targetId}-dist-decay`).value = (distDecay * 100).toFixed(3);
+			document.getElementById(`etf${targetId}-dist-accel`).value = (distAccel * 100).toFixed(5); 
+			
+			// Update Labels
+			document.querySelector(`#etf${targetId}-rate-wrap label`).innerText = `Dist Rate (%/${unit})`;
+			document.querySelector(`#etf${targetId}-abs-wrap label`).innerText = `Abs Dist (%/${unit})`;
+			
+			// Store Data
+			etfConfig[`etf${targetId}`].name = sym;
+			etfConfig[`etf${targetId}`].interval = interval;
+			etfConfig[`etf${targetId}`].unit = unit;
+			
+			// Store History Data
+			histData[`etf${targetId}`] = {
+				prices: [...cleanPrices],
+				times: [...cleanTimes],
+				divs: [...rawDivs]
 			};
 
 			const fmt = (v) => (v*100).toFixed(3);
-			const fmtAcc = (v) => {
-				const s = v>0 ? '+' : '';
-				const c = v>0 ? '#ef4444' : '#16a34a'; // Red = accelerating decay
-				return `<span style="color:${c}">${s}${(v*100).toFixed(4)}%</span>`;
-			};
-
 			status.innerHTML = `
 				<div class="analysis-results">
-					<strong>${sym} Analysis (${cleanPrices.length} wks)</strong>
-					<div class="metric-row"><span>NAV Decay:</span> <span style="color:#2563eb">${fmt(avgNavDecay)}%/wk</span></div>
-					<div class="metric-row"><span>NAV Accel:</span> <span>${fmtAcc(navAccel)}/wk²</span></div>
-					<hr style="margin:4px 0; border:0; border-top:1px dashed #eee;">
-					<div class="metric-row"><span>Dist Rate:</span> <span style="color:#16a34a">${fmt(distRate)}%/${unit}</span></div>
-					<div class="metric-row"><span>Yield Decay:</span> <span>${fmt(distDecay)}%/wk</span></div>
-					<div class="metric-row"><span>Yield Accel:</span> <span>${fmtAcc(distAccel)}/wk²</span></div>
-					<div class="history-badge">Ready to Apply</div>
+					<strong>Loaded ${sym} into ETF ${targetId}</strong><br>
+					NAV Decay: ${fmt(avgNavDecay)}% | Yield Decay: ${fmt(distDecay)}%
 				</div>`;
 			
-			btns[1].disabled = false;
-			btns[2].disabled = false;
+			calculate();
 
 		} catch (e) {
 			console.error(e);
 			status.innerHTML = `<div class="error">Error: ${e.message}</div>`;
 		} finally {
-			btns[0].disabled = false;
+			btns.forEach(b => b.disabled = false);
 		}
-	}
-
-	function applyToETF(id) {
-		if(!analysisTemp) return;
-		
-		// Set Inputs
-		document.getElementById(`etf${id}-nav-decay`).value = (analysisTemp.navDecay * 100).toFixed(3);
-		document.getElementById(`etf${id}-nav-accel`).value = (analysisTemp.navAccel * 100).toFixed(5);
-		
-		document.getElementById(`etf${id}-dist-rate`).value = (analysisTemp.distRate * 100).toFixed(3);
-		document.getElementById(`etf${id}-dist-decay`).value = (analysisTemp.distDecay * 100).toFixed(3);
-		document.getElementById(`etf${id}-dist-accel`).value = (analysisTemp.distAccel * 100).toFixed(5); 
-		
-		// Update Labels
-		document.querySelector(`#etf${id}-rate-wrap label`).innerText = `Dist Rate (%/${analysisTemp.unit})`;
-		document.querySelector(`#etf${id}-abs-wrap label`).innerText = `Abs Dist (%/${analysisTemp.unit})`;
-		
-		// Store Data
-		etfConfig[`etf${id}`].name = analysisTemp.sym;
-		etfConfig[`etf${id}`].interval = analysisTemp.interval;
-		etfConfig[`etf${id}`].unit = analysisTemp.unit;
-		
-		// Store History Data
-		histData[`etf${id}`] = {
-			prices: [...analysisTemp.prices],
-			times: [...analysisTemp.times],
-			divs: [...analysisTemp.divs]
-		};
-
-		calculate();
 	}
 
 	// --- Core Logic ---
