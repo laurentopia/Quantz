@@ -3,7 +3,7 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>ETF Distribution & NAV Comparator v44</title>
+	<title>ETF Distribution & NAV Comparator v49 (Fixed)</title>
 	<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 	<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
 	<style>
@@ -24,16 +24,20 @@
 		
 		/* Inputs */
 		label { display: block; font-size: 0.8rem; font-weight: 600; color: #64748b; margin-bottom: 4px; }
-		input { width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-family: monospace; }
+		input { width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-family: monospace; transition: 0.3s; }
 		
+		/* Dynamic Input Coloring */
+		input.bad-val { border-color: #fca5a5; background-color: #fef2f2; color: #dc2626; font-weight: bold; }
+		input.good-val { border-color: #86efac; background-color: #f0fdf4; color: #16a34a; font-weight: bold; }
+
 		/* Buttons */
 		button { width: 100%; padding: 10px; border: none; border-radius: 4px; color: white; font-weight: 600; cursor: pointer; transition: 0.2s; }
 		button:disabled { background: #94a3b8 !important; cursor: wait; }
 		.btn-1 { background: var(--p1); } .btn-1:hover { background: #1d4ed8; }
 		.btn-2 { background: var(--p2); } .btn-2:hover { background: #be185d; }
-		.quick-btn { background: #64748b; font-size: 0.75rem; padding: 4px 8px; width: auto; }
+		.quick-btn { background: #64748b; font-size: 0.75rem; padding: 4px 12px; width: auto; }
 		.quick-btn:hover { background: #475569; }
-		.quick-bar { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 10px; }
+		.quick-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 15px; }
 
 		/* Chart */
 		.chart-box { position: relative; height: 500px; margin-bottom: 25px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; }
@@ -58,30 +62,31 @@
 <body>
 
 <div class="container">
-	<h1>ETF Distribution & NAV Comparator v44</h1>
+	<h1>ETF Distribution & NAV Comparator v49</h1>
 
 	<!-- ANALYSIS TOOL -->
 	<div class="panel ticker-tool">
 		<div class="grid-4">
-			<div><label>Ticker</label><input type="text" id="ticker" value="QQQI"></div>
-			<div><label>Start</label><input type="date" id="start-date"></div>
-			<div><label>End</label><input type="date" id="end-date"></div>
+			<div><label>Ticker</label><input type="text" id="ticker" value="QQQ"></div>
+			<div><label>Start (1 Year Ago)</label><input type="date" id="start-date"></div>
+			<div><label>End (Today)</label><input type="date" id="end-date"></div>
 			<div style="display:flex; gap:10px;">
 				<button class="btn-1" id="btn-1" onclick="runAnalysis(1)">Analyze &rarr; ETF 1</button>
 				<button class="btn-2" id="btn-2" onclick="runAnalysis(2)">Analyze &rarr; ETF 2</button>
 			</div>
 		</div>
 		<div id="status-msg"></div>
+		
+		<!-- PRESETS -->
 		<div class="quick-bar">
-			<button class="quick-btn" onclick="setT('JEPY')">JEPY</button>
-			<button class="quick-btn" onclick="setT('QQQY')">ORR</button>
-			<button class="quick-btn" onclick="setT('QQQY')">QQQI</button>
+			<button class="quick-btn" onclick="setT('ORR')">ORR</button>
 			<button class="quick-btn" onclick="setT('TSYY')">TSYY</button>
-			<button class="quick-btn" onclick="setT('IWMY')">IWMY</button>
-			<button class="quick-btn" onclick="setT('JEPI')">JEPI</button>
-			<button class="quick-btn" onclick="setT('SPYI')">SPYI</button>
-			<button class="quick-btn" onclick="setT('QDTE')">QDTE</button>
-			<button class="quick-btn" onclick="setT('XDTE')">XDTE</button>
+			<button class="quick-btn" onclick="setT('TSYY')">ULTY</button>
+			<button class="quick-btn" onclick="setT('TSYY')">KYLD</button>
+			<button class="quick-btn" onclick="setT('QQQI')">QQQI</button>
+			<button class="quick-btn" onclick="setT('MSTY')">MSTY</button>
+			<button class="quick-btn" onclick="setT('NVDY')">NVDY</button>
+			<button class="quick-btn" onclick="setT('JEPY')">JEPY</button>
 		</div>
 	</div>
 
@@ -102,12 +107,12 @@
 			<div class="grid-2">
 				<div>
 					<label>NAV Decay (%/wk)</label><input type="number" id="n-dec-1" value="0.5" step="0.001">
-					<label>NAV Accel (%/wk²)</label><input type="number" id="n-acc-1" value="0.0" step="0.00001">
+					<label>NAV Decay Accel (%/wk²)</label><input type="number" id="n-acc-1" value="0.0" step="0.00001">
 				</div>
 				<div>
 					<label>Yield Rate (%/pay)</label><input type="number" id="y-rat-1" value="1.0" step="0.001">
 					<label>Yield Decay (%/wk)</label><input type="number" id="y-dec-1" value="0.0" step="0.001">
-					<label>Yield Accel (%/wk²)</label><input type="number" id="y-acc-1" value="0.0" step="0.00001">
+					<label>Yield Decay Accel (%/wk²)</label><input type="number" id="y-acc-1" value="0.0" step="0.00001">
 				</div>
 			</div>
 			<div style="margin-top:10px; font-size:0.8rem; color:#666;" id="meta-1">Freq: Weekly</div>
@@ -119,12 +124,12 @@
 			<div class="grid-2">
 				<div>
 					<label>NAV Decay (%/wk)</label><input type="number" id="n-dec-2" value="0.1" step="0.001">
-					<label>NAV Accel (%/wk²)</label><input type="number" id="n-acc-2" value="0.0" step="0.00001">
+					<label>NAV Decay Accel (%/wk²)</label><input type="number" id="n-acc-2" value="0.0" step="0.00001">
 				</div>
 				<div>
 					<label>Yield Rate (%/pay)</label><input type="number" id="y-rat-2" value="0.5" step="0.001">
 					<label>Yield Decay (%/wk)</label><input type="number" id="y-dec-2" value="0.0" step="0.001">
-					<label>Yield Accel (%/wk²)</label><input type="number" id="y-acc-2" value="0.0" step="0.00001">
+					<label>Yield Decay Accel (%/wk²)</label><input type="number" id="y-acc-2" value="0.0" step="0.00001">
 				</div>
 			</div>
 			<div style="margin-top:10px; font-size:0.8rem; color:#666;" id="meta-2">Freq: Weekly</div>
@@ -213,7 +218,6 @@
 	});
 
 	// --- MATH ---
-	// OLS Regression: Returns Slope (m)
 	function getSlope(data) {
 		const n = data.length;
 		if (n < 2) return 0;
@@ -222,8 +226,7 @@
 			sumX += p.x; sumY += p.y;
 			sumXY += (p.x * p.y); sumXX += (p.x * p.x);
 		}
-		const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
-		return slope;
+		return (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
 	}
 
 	function setT(t) { document.getElementById('ticker').value = t; }
@@ -269,16 +272,14 @@
 			
 			const closes = res.indicators.quote[0].close;
 			const times = res.timestamp;
-			
 			const P = [], T = [];
-			closes.forEach((c, i) => { if(c !== null && c > 0) { P.push(c); T.push(times[i]); } });
-			if (P.length < 5) throw new Error("Not enough price data");
-
-			// 1. NAV Erosion Analysis (Using Log Returns)
-			// Log Return r_t = ln(P_t / P_t-1)
-			// Decay = -1 * Average(r_t) (Positive Decay = Loss)
-			// Accel = -1 * Slope(r_t) (Positive Accel = Loss speeding up)
 			
+			// Clean Data
+			closes.forEach((c, i) => { if(c !== null && c > 0) { P.push(c); T.push(times[i]); } });
+
+			if(P.length < 5) throw new Error('Insufficient data points');
+
+			// 1. NAV Decay (Logarithmic Geometric Mean)
 			let logReturns = [];
 			let sumRet = 0;
 			const tStart = T[0];
@@ -286,42 +287,43 @@
 			for(let i=1; i<P.length; i++) {
 				const r = Math.log(P[i] / P[i-1]);
 				sumRet += r;
-				const x = (T[i] - tStart) / 604800; // Time in weeks
+				const x = (T[i] - tStart) / 604800; // weeks
 				logReturns.push({x, y: r});
 			}
 
-			const avgLogRet = sumRet / logReturns.length;
-			const slopeLogRet = getSlope(logReturns);
+			// Base Decay on Average Weekly Log Return (Most robust for volatile assets)
+			const avgNavDecay = -1 * (sumRet / logReturns.length);
+			
+			// Calculate Slope just for stats display (Acceleration)
+			const slope = getSlope(logReturns);
+			const navAccel = -1 * slope;
 
-			const navDecay = -avgLogRet;
-			const navAccel = -slopeLogRet;
-
-			// 2. Yield Analysis (Strict Isolation)
+			// 2. Yield Analysis
 			let rawDivs = [];
 			if (res.events && res.events.dividends) {
 				rawDivs = Object.values(res.events.dividends).sort((a,b) => a.date - b.date);
 			}
 
-			let yields = []; // {x: time, y: yieldRatio}
+			let yields = []; 
 			let intervals = [];
 			
-			if (rawDivs.length > 1) {
+			if (rawDivs.length > 0) {
 				for(let i=0; i<rawDivs.length; i++) {
 					const div = rawDivs[i];
+					// Find Price just before or at dividend date
 					const idx = T.findIndex(t => t >= div.date);
-					const priceAtDiv = (idx !== -1) ? P[idx] : P[P.length-1];
+					// Use prior close if possible to get "Pre-Drop" price for accurate yield %
+					const p = (idx > 0) ? P[idx-1] : (idx > -1 ? P[idx] : P[P.length-1]);
 					
-					if (priceAtDiv > 0) {
-						// Pure Yield = Dividend / Price
-						const y = div.amount / priceAtDiv;
+					if (p > 0) {
+						const y = div.amount / p;
 						yields.push({ t: div.date, y: y });
 					}
-					
 					if (i > 0) intervals.push((div.date - rawDivs[i-1].date)/86400);
 				}
 			}
 
-			// Frequency
+			// Frequency Detection
 			let freq = 1; let unit = 'week';
 			if (intervals.length > 0) {
 				const avgDays = intervals.reduce((a,b)=>a+b,0) / intervals.length;
@@ -329,39 +331,34 @@
 				if (freq > 10) unit = 'quarter'; else if (freq >= 3) unit = 'month'; else if (freq >= 2) unit = 'biweek';
 			}
 
-			// Yield Stats (Log-Linear Regression on Yield Curve)
-			// Fit ln(Yield) = a + bt
-			// Decay Rate = -b
+			// Yield Stats
 			let avgYieldRate = 0;
 			let yieldDecay = 0;
-			let yieldAccel = 0; // 2nd derivative (change in b), usually noisy, set to 0 or derive from slope change
 
-			if (yields.length > 2) {
+			if (yields.length > 0) {
 				avgYieldRate = yields.reduce((a,b)=>a+b.y,0)/yields.length;
 				
-				let logYields = [];
-				const tYStart = yields[0].t;
-				yields.forEach(p => {
-					if(p.y > 0) {
-						logYields.push({ x: (p.t - tYStart)/604800, y: Math.log(p.y) });
-					}
-				});
-				
-				const slopeY = getSlope(logYields);
-				yieldDecay = -slopeY; // Positive = Yield Shrinking
-				// We won't calculate 2nd derivative accel for yield to avoid noise explosions
-				yieldAccel = 0; 
+				if (yields.length > 3) {
+					let logYields = [];
+					const tYStart = yields[0].t;
+					yields.forEach(p => {
+						if(p.y > 0) logYields.push({ x: (p.t - tYStart)/604800, y: Math.log(p.y) });
+					});
+					const slopeY = getSlope(logYields);
+					yieldDecay = -slopeY;
+				}
 			}
 
-			// --- UI ---
+			// Apply to Inputs
+			// Safe Defaults: Use Average Decay/Yield. Set Acceleration to 0 to prevent wild extrapolations.
 			const setV = (k, v) => document.getElementById(k).value = v;
 			
-			setV(`n-dec-${id}`, (navDecay * 100).toFixed(4));
-			setV(`n-acc-${id}`, (navAccel * 100).toFixed(6));
+			setV(`n-dec-${id}`, (avgNavDecay * 100).toFixed(4));
+			setV(`n-acc-${id}`, "0.0"); // Zero out accel by default for safety
 			
 			setV(`y-rat-${id}`, (avgYieldRate * 100).toFixed(3));
-			setV(`y-dec-${id}`, (yieldDecay * 100).toFixed(4));
-			setV(`y-acc-${id}`, (yieldAccel * 100).toFixed(6));
+			setV(`y-dec-${id}`, (yieldDecay * 100).toFixed(4)); 
+			setV(`y-acc-${id}`, "0.0");
 
 			document.getElementById(`meta-${id}`).innerText = `Freq: Every ~${freq} wks (${unit})`;
 			document.getElementById(`h-${id}`).innerText = sym;
@@ -370,25 +367,26 @@
 			H[id] = { prices: P, times: T, divs: rawDivs }; 
 
 			const fmt = (n, inv=false) => {
-				const s = (n*100).toFixed(3) + '%';
-				const isBad = inv ? n < 0 : n > 0;
+				const s = (n*100).toFixed(4) + '%';
+				const isBad = inv ? n < 0 : n > 0; // Decay > 0 is bad. Yield < 0 is bad.
 				return `<span class="${isBad?'bad':'good'}">${s}</span>`;
 			};
 			
 			msg.innerHTML = `
 				<div class="analysis-res">
-					<strong>${sym} Results (${P.length} wks)</strong>
-					<div class="res-row"><span>NAV Decay:</span> ${fmt(navDecay)}</div>
-					<div class="res-row"><span>NAV Accel:</span> ${fmt(navAccel)}</div>
+					<strong>${sym} Stats (${P.length} wks)</strong>
+					<div class="res-row"><span>Avg NAV Decay:</span> ${fmt(avgNavDecay)}</div>
+					<div class="res-row"><span>NAV Decay Trend:</span> ${fmt(navAccel)}</div>
 					<hr>
-					<div class="res-row"><span>Yield Rate:</span> ${fmt(avgYieldRate, true)}</div>
-					<div class="res-row"><span>Yield Decay:</span> ${fmt(yieldDecay)}</div>
+					<div class="res-row"><span>Avg Yield:</span> ${fmt(avgYieldRate, true)}</div>
+					<div class="res-row"><span>Yield Trend:</span> ${fmt(yieldDecay)}</div>
 				</div>
 			`;
 
 			calculate();
 
 		} catch (e) {
+			console.error(e);
 			msg.innerHTML = `<div class="error">${e.message}</div>`;
 		} finally {
 			btns.forEach(b => b.disabled = false);
@@ -400,6 +398,17 @@
 		const inv = parseFloat(document.getElementById('invest').value) || 10000;
 		const weeks = parseInt(document.getElementById('weeks').value) || 52;
 		const showHist = document.getElementById('hist').checked;
+
+		// Input coloring
+		const colorize = (id) => {
+			const el = document.getElementById(id);
+			if(!el) return;
+			const v = parseFloat(el.value);
+			el.className = v > 0 ? 'bad-val' : (v < 0 ? 'good-val' : '');
+		};
+		for(let i=1; i<=2; i++) {
+			['n-dec','n-acc','y-dec','y-acc'].forEach(k => colorize(`${k}-${i}`));
+		}
 
 		let histLen = 0;
 		if (showHist) {
@@ -463,17 +472,14 @@
 			let yieldDecayCum = 0;
 
 			for(let w=1; w<=weeks; w++) {
-				// 1. NAV Erosion
 				const curNDec = nDec + (nAcc * w);
 				price *= (1 - curNDec);
 				if (price < 0.0001) price = 0;
 
-				// 2. Yield Decay
 				const curYDec = yDec + (yAcc * w);
 				yieldDecayCum += curYDec;
-				const yieldMult = Math.max(0, 1 - yieldDecayCum); // Simple Linear decay of yield factor
+				const yieldMult = Math.max(0, 1 - yieldDecayCum); 
 
-				// 3. Payout
 				if (w % freq === 0 && price > 0) {
 					const payPerShare = price * (yRat * yieldMult);
 					cash += (sharesP * payPerShare);
@@ -551,9 +557,9 @@
 	function loadUrl() {
 		const p = new URLSearchParams(location.search);
 		if(!p.has('inv')) return;
-		document.getElementById('ticker').value = p.get('t') || 'JEPY';
-		document.getElementById('start-date').value = p.get('sd');
-		document.getElementById('end-date').value = p.get('ed');
+		document.getElementById('ticker').value = p.get('t') || 'TSYY';
+		if(p.get('sd')) document.getElementById('start-date').value = p.get('sd');
+		if(p.get('ed')) document.getElementById('end-date').value = p.get('ed');
 		document.getElementById('invest').value = p.get('inv');
 		document.getElementById('weeks').value = p.get('w');
 		document.getElementById('hist').checked = p.get('h') === 'true';
@@ -583,14 +589,23 @@
 		if(el) el.addEventListener(el.type==='number'?'input':'change', debounce(calculate, 300));
 	});
 
-	// Init
-	const d = new Date();
-	document.getElementById('end-date').value = d.toISOString().split('T')[0];
-	d.setMonth(d.getMonth()-12);
-	document.getElementById('start-date').value = d.toISOString().split('T')[0];
-	
-	loadUrl();
-	calculate();
+	// Init (Strict Order)
+	document.addEventListener('DOMContentLoaded', () => {
+		const d = new Date();
+		const end = d.toISOString().split('T')[0];
+		d.setFullYear(d.getFullYear() - 1);
+		const start = d.toISOString().split('T')[0];
+		
+		const elS = document.getElementById('start-date');
+		const elE = document.getElementById('end-date');
+		
+		// Only set defaults if empty (allows browser cache to persist if refreshed)
+		if(!elS.value) elS.value = start;
+		if(!elE.value) elE.value = end;
+
+		loadUrl();
+		calculate();
+	});
 
 </script>
 </body>
